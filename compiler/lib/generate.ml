@@ -660,7 +660,7 @@ let fold_children blocks pc f accu =
   match block.branch with
   | Return _ | Raise _ | Stop -> accu
   | Branch (pc', _) | Poptrap (pc', _) -> f pc' accu
-  | Pushtrap ((pc1, _), _, (pc2, _), _) ->
+  | Pushtrap ((pc1, _), _, (pc2, _)) ->
       let accu = f pc1 accu in
       let accu = f pc2 accu in
       accu
@@ -697,7 +697,7 @@ let build_graph ctx pc =
       List.iter pc_succs ~f:(fun pc' ->
           let pushtrap =
             match b.branch with
-            | Pushtrap ((pc1, _), _, (pc2, _), _remove) ->
+            | Pushtrap ((pc1, _), _, (pc2, _)) ->
                 if pc' = pc1
                 then (
                   Hashtbl.add poptrap pc1 Addr.Set.empty;
@@ -1444,16 +1444,11 @@ and compile_block_no_loop st queue (pc : Addr.t) loop_stack frontier interm =
   let block = Addr.Map.find pc st.blocks in
   let seq, queue = translate_instrs st.ctx queue (source_location st.ctx pc) block.body in
   match block.branch with
-  | Code.Pushtrap ((pc1, args1), x, (pc2, args2), pc3s) ->
+  | Code.Pushtrap ((pc1, args1), x, (pc2, args2)) ->
       let backs = Hashtbl.find st.backs pc in
       assert (Addr.Set.is_empty backs);
       let exn_frontier = dominance_frontier st pc2 in
-      (* We need to make sure that pc3 is live (indeed, the
-         continuation may have been optimized away by inlining) *)
-      (* TODO: pc3s should be computed as part of [build_graph] and removed from the constructor. *)
-      let pc3s = Addr.Set.filter (fun pc -> Hashtbl.mem st.succs pc) pc3s in
-      let pc3s' = Hashtbl.find st.poptrap pc1 in
-      assert (Addr.Set.equal pc3s pc3s');
+      let pc3s = Hashtbl.find st.poptrap pc1 in
       (* no need to limit body for simple flow with no
          instruction.  eg return and branch *)
       let rec limit pc =

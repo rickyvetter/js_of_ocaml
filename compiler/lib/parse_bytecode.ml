@@ -539,16 +539,12 @@ module State = struct
     | Var x -> Format.fprintf f "%a" Var.print x
     | Dummy -> Format.fprintf f "???"
 
-  type handler = { block_pc : Addr.t }
-
   type t =
     { accu : elt
     ; stack : elt list
     ; env : elt array
     ; env_offset : int
-    ; handlers : handler list
     ; globals : globals
-    ; current_pc : Addr.t
     }
 
   let fresh_var state =
@@ -608,9 +604,9 @@ module State = struct
   let assign st n = { st with stack = st_assign st.stack n st.accu }
 
   let start_function state env offset =
-    { state with accu = Dummy; stack = []; env; env_offset = offset; handlers = [] }
+    { state with accu = Dummy; stack = []; env; env_offset = offset }
 
-  let start_block current_pc state =
+  let start_block state =
     let stack =
       List.fold_right state.stack ~init:[] ~f:(fun e stack ->
           match e with
@@ -619,7 +615,7 @@ module State = struct
               let y = Var.fork x in
               Var y :: stack)
     in
-    let state = { state with stack; current_pc } in
+    let state = { state with stack } in
     match state.accu with
     | Dummy -> state
     | Var x ->
@@ -627,25 +623,7 @@ module State = struct
         Var.propagate_name x y;
         state
 
-  let push_handler state =
-    { state with handlers = { block_pc = state.current_pc } :: state.handlers }
-
-  let pop_handler state = { state with handlers = List.tl state.handlers }
-
-  let addr_of_current_handler state =
-    match state.handlers with
-    | [] -> assert false
-    | x :: _ -> x.block_pc
-
-  let initial g =
-    { accu = Dummy
-    ; stack = []
-    ; env = [||]
-    ; env_offset = 0
-    ; handlers = []
-    ; globals = g
-    ; current_pc = -1
-    }
+  let initial g = { accu = Dummy; stack = []; env = [||]; env_offset = 0; globals = g }
 
   let rec print_stack f l =
     match l with
@@ -763,8 +741,6 @@ let tagged_blocks = ref Addr.Set.empty
 
 let compiled_blocks = ref Addr.Map.empty
 
-let pushpop = ref Addr.Map.empty
-
 let method_cache_id = ref 1
 
 let clo_offset_3 = if new_closure_repr then 3 else 2
@@ -797,7 +773,7 @@ let rec compile_block blocks debug_data code pc state =
     in
     if debug_parser ()
     then Format.eprintf "Compiling from %s to %d@." (string_of_addr pc) (limit - 1);
-    let state = State.start_block pc state in
+    let state = State.start_block state in
     tagged_blocks := Addr.Set.add pc !tagged_blocks;
     let instr, last, state' =
       compile { blocks; code; limit; debug = debug_data } pc state []
@@ -1491,7 +1467,7 @@ and compile infos pc state instrs =
           infos.debug
           code
           (pc + 2)
-          { (State.push_handler state) with
+          { state with
             State.stack =
               (* See interp.c *)
               State.Dummy
@@ -1501,26 +1477,11 @@ and compile infos pc state instrs =
               :: state.State.stack
           };
         ( instrs
-        , Pushtrap
-            ( (pc + 2, State.stack_vars state)
-            , x
-            , (addr, State.stack_vars state')
-            , Addr.Set.empty )
+        , Pushtrap ((pc + 2, State.stack_vars state), x, (addr, State.stack_vars state'))
         , state )
     | POPTRAP ->
         let addr = pc + 1 in
-        let handler_addr = State.addr_of_current_handler state in
-        let set =
-          try Addr.Set.add addr (Addr.Map.find handler_addr !pushpop)
-          with Not_found -> Addr.Set.singleton addr
-        in
-        pushpop := Addr.Map.add handler_addr set !pushpop;
-        compile_block
-          infos.blocks
-          infos.debug
-          code
-          addr
-          (State.pop 4 (State.pop_handler state));
+        compile_block infos.blocks infos.debug code addr (State.pop 4 state);
         instrs, Poptrap (addr, State.stack_vars state), state
     | RERAISE | RAISE_NOTRACE | RAISE ->
         let kind =
@@ -2140,18 +2101,6 @@ and compile infos pc state instrs =
 
 (****)
 
-let match_exn_traps (blocks : 'a Addr.Map.t) =
-  Addr.Map.fold
-    (fun pc conts' blocks ->
-      match Addr.Map.find pc blocks with
-      | { branch = Pushtrap (cont1, x, cont2, conts); _ } as block ->
-          assert (Addr.Set.is_empty conts);
-          let branch = Pushtrap (cont1, x, cont2, conts') in
-          Addr.Map.add pc { block with branch } blocks
-      | _ -> assert false)
-    !pushpop
-    blocks
-
 (****)
 
 type one =
@@ -2182,12 +2131,10 @@ let parse_bytecode code globals debug_data =
             { params = State.stack_vars state; body = instr; branch = last })
           !compiled_blocks
       in
-      let blocks = match_exn_traps blocks in
       let free_pc = String.length code / 4 in
       { start; blocks; free_pc })
     else Code.empty
   in
-  pushpop := Addr.Map.empty;
   compiled_blocks := Addr.Map.empty;
   tagged_blocks := Addr.Set.empty;
   p
