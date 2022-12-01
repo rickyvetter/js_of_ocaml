@@ -1,6 +1,7 @@
 # dev (202?-??) - ??
 ## Features/Changes
 * Compiler: small refactoring in code generation
+* Compiler: rewrite control flow compilation logic
 * Misc: fix and update benchmarks
 * Misc: upgrade CI
 * Toplevel: recover more names when generating code during toplevel evaluation
