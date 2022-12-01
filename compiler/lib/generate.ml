@@ -525,6 +525,7 @@ type state =
       (Addr.t, int list) Hashtbl.t (* List of forward successors for a given block *)
   ; backs : (Addr.t, Addr.Set.t) Hashtbl.t (* Set of back edges for a given block *)
   ; preds : (Addr.t, int) Hashtbl.t (* Number of predecessors for a given block *)
+  ; poptrap : (Addr.t, Addr.Set.t) Hashtbl.t (* poptraps for a given pushtrap *)
   ; seen : (Addr.t, int) Hashtbl.t
         (* For blocks that are member of a frontier, it's the number of predecessor already compiled *)
   ; loops : Addr.Set.t
@@ -674,12 +675,13 @@ let build_graph ctx pc =
   let visited_blocks = ref Addr.Set.empty in
   let loops = ref Addr.Set.empty in
   let succs = Hashtbl.create 17 in
+  let poptrap = Hashtbl.create 17 in
   let backs = Hashtbl.create 17 in
   let preds = Hashtbl.create 17 in
   let seen = Hashtbl.create 17 in
   let blocks = ctx.Ctx.blocks in
   let dominance_frontier_cache = Hashtbl.create 17 in
-  let rec loop pc anc =
+  let rec loop pc anc pushtrap =
     if not (Addr.Set.mem pc !visited_blocks)
     then (
       visited_blocks := Addr.Set.add pc !visited_blocks;
@@ -689,19 +691,41 @@ let build_graph ctx pc =
       Hashtbl.add backs pc pc_backs;
       let s = fold_children blocks pc (fun x l -> x :: l) [] in
       let pc_succs = List.filter s ~f:(fun pc -> not (Addr.Set.mem pc anc)) in
+      let b = Addr.Map.find pc blocks in
       Hashtbl.add succs pc pc_succs;
       Addr.Set.iter (fun pc' -> loops := Addr.Set.add pc' !loops) pc_backs;
-      List.iter pc_succs ~f:(fun pc' -> loop pc' anc);
+      List.iter pc_succs ~f:(fun pc' ->
+          let pushtrap =
+            match b.branch with
+            | Pushtrap ((pc1, _), _, (pc2, _), _remove) ->
+                if pc' = pc1
+                then (
+                  Hashtbl.add poptrap pc1 Addr.Set.empty;
+                  pc1 :: pushtrap)
+                else (
+                  assert (pc' = pc2);
+                  pushtrap)
+            | Poptrap (pc1, _) -> (
+                match pushtrap with
+                | [] -> assert false
+                | p :: rest ->
+                    let old = Hashtbl.find poptrap p in
+                    Hashtbl.replace poptrap p (Addr.Set.add pc1 old);
+                    rest)
+            | _ -> pushtrap
+          in
+          loop pc' anc pushtrap);
       List.iter pc_succs ~f:(fun pc' ->
           match Hashtbl.find preds pc' with
           | exception Not_found -> Hashtbl.add preds pc' 1
           | n -> Hashtbl.replace preds pc' (succ n)))
   in
-  loop pc Addr.Set.empty;
+  loop pc Addr.Set.empty [];
   Hashtbl.add preds pc 1;
   { visited_blocks
   ; dominance_frontier_cache
   ; seen
+  ; poptrap
   ; loops = !loops
   ; succs
   ; backs
@@ -1428,6 +1452,8 @@ and compile_block_no_loop st queue (pc : Addr.t) loop_stack frontier interm =
          continuation may have been optimized away by inlining) *)
       (* TODO: pc3s should be computed as part of [build_graph] and removed from the constructor. *)
       let pc3s = Addr.Set.filter (fun pc -> Hashtbl.mem st.succs pc) pc3s in
+      let pc3s' = Hashtbl.find st.poptrap pc1 in
+      assert (Addr.Set.equal pc3s pc3s');
       (* no need to limit body for simple flow with no
          instruction.  eg return and branch *)
       let rec limit pc =
