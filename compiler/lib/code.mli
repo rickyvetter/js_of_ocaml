@@ -165,6 +165,10 @@ type prim_arg =
   | Pv of Var.t
   | Pc of constant
 
+type special =
+  | Alias_prim of string
+  | Override_module of string * string
+
 type expr =
   | Apply of
       { f : Var.t
@@ -176,6 +180,7 @@ type expr =
   | Closure of Var.t list * cont
   | Constant of constant
   | Prim of prim * prim_arg list
+  | Special of special
 
 type instr =
   | Let of Var.t * expr
