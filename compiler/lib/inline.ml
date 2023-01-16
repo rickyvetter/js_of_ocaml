@@ -26,21 +26,72 @@ type prop =
   ; optimizable : bool
   }
 
+type closure_info =
+  { cl_params : Var.t list
+  ; cl_cont : int * Var.t list
+  ; cl_prop : prop
+  ; cl_simpl : (Var.Set.t * bool) option
+  }
+
+let block_size { branch; body; _ } =
+  List.length body
+  +
+  match branch with
+  | Cond _ -> 2
+  | Switch (_, a1, a2) -> Array.length a1 + Array.length a2
+  | _ -> 0
+
+let size_threshold = 20
+
+let simple_function blocks name params pc =
+  let bound_vars =
+    ref
+      (List.fold_left
+         ~f:(fun s x -> Var.Set.add x s)
+         ~init:Var.Set.empty
+         (name :: params))
+  in
+  let recursive = ref false in
+  let size = ref 0 in
+  try
+    Code.preorder_traverse
+      { fold = Code.fold_children }
+      (fun pc () ->
+        let block = Addr.Map.find pc blocks in
+        size := !size + block_size block;
+        if !size > size_threshold then raise Exit;
+        (match block.branch with
+        | Pushtrap _ -> raise Exit
+        | _ -> ());
+        List.iter block.body ~f:(fun i ->
+            match i with
+            | Let (_, Closure _) -> raise Exit
+            | _ -> ());
+        Freevars.iter_block_bound_vars
+          (fun x -> bound_vars := Var.Set.add x !bound_vars)
+          block;
+        Freevars.iter_block_free_vars
+          (fun x ->
+            if not (Var.Set.mem x !bound_vars) then raise Exit;
+            if Var.equal x name then recursive := true)
+          block)
+      pc
+      blocks
+      ();
+    (*
+    Format.eprintf "SMALL: %a %d %b@." Var.print name !size !recursive;
+*)
+    Some (!bound_vars, !recursive)
+  with Exit -> None
+
+(****)
+
 let optimizable blocks pc _ =
   Code.traverse
     { fold = Code.fold_children }
     (fun pc { size; optimizable } ->
       let b = Addr.Map.find pc blocks in
-      let this_size =
-        match b with
-        | { branch; body; _ } -> (
-            List.length body
-            +
-            match branch with
-            | Cond _ -> 2
-            | Switch (_, a1, a2) -> Array.length a1 + Array.length a2
-            | _ -> 0)
-      in
+      let this_size = block_size b in
       let optimizable =
         optimizable
         && List.for_all b.body ~f:(function
@@ -79,12 +130,13 @@ let get_closures { blocks; _ } =
     (fun _ block closures ->
       List.fold_left block.body ~init:closures ~f:(fun closures i ->
           match i with
-          | Let (x, Closure (l, cont)) ->
-              let cont = follow_branch blocks cont in
+          | Let (x, Closure (cl_params, cl_cont)) ->
+              let cont = follow_branch blocks cl_cont in
               (* we can compute this once during the pass
                  as the property won't change with inlining *)
-              let f_optimizable = optimizable blocks (fst cont) true in
-              Var.Map.add x (l, cont, f_optimizable) closures
+              let cl_prop = optimizable blocks (fst cont) true in
+              let cl_simpl = simple_function blocks x cl_params (fst cont) in
+              Var.Map.add x { cl_params; cl_cont; cl_prop; cl_simpl } closures
           | _ -> closures))
     blocks
     Var.Map.empty
@@ -184,31 +236,40 @@ let rec args_equal xs ys =
   | x :: xs, Pv y :: ys -> Code.Var.compare x y = 0 && args_equal xs ys
   | _ -> false
 
-let inline live_vars closures pc (outer, blocks, free_pc) =
-  let block = Addr.Map.find pc blocks in
-  let body, (outer, branch, blocks, free_pc) =
+let inline live_vars closures name pc (outer, p) =
+  let block = Addr.Map.find pc p.blocks in
+  let body, (outer, branch, p) =
     List.fold_right
       block.body
-      ~init:([], (outer, block.branch, blocks, free_pc))
+      ~init:([], (outer, block.branch, p))
       ~f:(fun i (rem, state) ->
         match i with
         | Let (x, Apply { f; args; exact = true; _ }) when Var.Map.mem f closures -> (
-            let outer, branch, blocks, free_pc = state in
-            let params, clos_cont, { size = f_size; optimizable = f_optimizable } =
+            let outer, branch, p = state in
+            let { cl_params = params
+                ; cl_cont = clos_cont
+                ; cl_prop = { size = f_size; optimizable = f_optimizable }
+                ; cl_simpl
+                } =
               Var.Map.find f closures
             in
-            match simple blocks clos_cont [ params, args ] with
+            match simple p.blocks clos_cont [ params, args ] with
             | `Alias arg -> (
                 match rem, branch with
-                | [], Return y when Var.compare x y = 0 ->
-                    [], (outer, Return arg, blocks, free_pc)
+                | [], Return y when Var.compare x y = 0 -> [], (outer, Return arg, p)
                 | _ ->
                     let blocks =
-                      Addr.Map.add free_pc { params = [ x ]; body = rem; branch } blocks
+                      Addr.Map.add
+                        p.free_pc
+                        { params = [ x ]; body = rem; branch }
+                        p.blocks
                     in
-                    [], (outer, Branch (free_pc, [ arg ]), blocks, free_pc + 1))
+                    ( []
+                    , ( outer
+                      , Branch (p.free_pc, [ arg ])
+                      , { p with blocks; free_pc = p.free_pc + 1 } ) ))
             | `Exp exp -> Let (x, exp) :: rem, state
-            | `Fail ->
+            | `Fail -> (
                 if live_vars.(Var.idx f) = 1
                    && Bool.equal outer.optimizable f_optimizable
                       (* Inlining the code of an optimizable function could
@@ -219,13 +280,13 @@ let inline live_vars closures pc (outer, blocks, free_pc) =
                     match rem, branch with
                     | [], Return y when Var.compare x y = 0 ->
                         (* We do not need a continuation block for tail calls *)
-                        blocks, None
+                        p.blocks, None
                     | _ ->
                         ( Addr.Map.add
-                            free_pc
+                            p.free_pc
                             { params = [ x ]; body = rem; branch }
-                            blocks
-                        , Some free_pc )
+                            p.blocks
+                        , Some p.free_pc )
                   in
                   let blocks = rewrite_closure blocks cont_pc (fst clos_cont) in
                   (* We do not really need this intermediate block.
@@ -233,15 +294,66 @@ let inline live_vars closures pc (outer, blocks, free_pc) =
                      parameters are used in the function body. *)
                   let blocks =
                     Addr.Map.add
-                      (free_pc + 1)
+                      (p.free_pc + 1)
                       { params; body = []; branch = Branch clos_cont }
                       blocks
                   in
                   let outer = { outer with size = outer.size + f_size } in
-                  [], (outer, Branch (free_pc + 1, args), blocks, free_pc + 2)
-                else i :: rem, state)
+                  ( []
+                  , ( outer
+                    , Branch (p.free_pc + 1, args)
+                    , { p with blocks; free_pc = p.free_pc + 2 } ) )
+                else
+                  match cl_simpl with
+                  | Some (bound_vars, recursive)
+                    when (not recursive)
+                         ||
+                         match name with
+                         | None -> true
+                         | Some f' -> not (Var.equal f f') ->
+                      let p, f, params, clos_cont =
+                        Duplicate.closure p ~bound_vars ~f ~params ~cont:clos_cont
+                      in
+                      (*
+                      Format.eprintf "DUPLICATE %a ==> %d@." Var.print f (fst clos_cont);
+*)
+                      if recursive
+                      then
+                        ( Let (f, Closure (params, clos_cont))
+                          :: Let (x, Apply { f; args; exact = true })
+                          :: rem
+                        , (outer, branch, p) )
+                      else
+                        let blocks, cont_pc =
+                          match rem, branch with
+                          | [], Return y when Var.compare x y = 0 ->
+                              (* We do not need a continuation block for tail calls *)
+                              p.blocks, None
+                          | _ ->
+                              ( Addr.Map.add
+                                  p.free_pc
+                                  { params = [ x ]; body = rem; branch }
+                                  p.blocks
+                              , Some p.free_pc )
+                        in
+                        let blocks = rewrite_closure blocks cont_pc (fst clos_cont) in
+                        (* We do not really need this intermediate block.
+                           It just avoids the need to find which function
+                           parameters are used in the function body. *)
+                        let blocks =
+                          Addr.Map.add
+                            (p.free_pc + 1)
+                            { params; body = []; branch = Branch clos_cont }
+                            blocks
+                        in
+                        let outer = { outer with size = outer.size + f_size } in
+                        ( []
+                        , ( outer
+                          , Branch (p.free_pc + 1, args)
+                          , { p with blocks; free_pc = p.free_pc + 2 } ) )
+                  | _ -> i :: rem, state))
         | Let (x, Closure (l, (pc, []))) when not (Config.Flag.effects ()) -> (
-            let block = Addr.Map.find pc blocks in
+            let block = Addr.Map.find pc p.blocks in
             match block with
             | { body = [ Let (y, Prim (Extern prim, args)) ]
               ; branch = Return y'
@@ -256,7 +368,7 @@ let inline live_vars closures pc (outer, blocks, free_pc) =
             | _ -> i :: rem, state)
         | _ -> i :: rem, state)
   in
-  outer, Addr.Map.add pc { block with body; branch } blocks, free_pc
+  outer, { p with blocks = Addr.Map.add pc { block with body; branch } p.blocks }
 
 (****)
 
@@ -266,30 +378,29 @@ let f p live_vars =
   Code.invariant p;
   let t = Timer.make () in
   let closures = get_closures p in
-  let _closures, blocks, free_pc =
+  let _closures, p =
     Code.fold_closures
       p
-      (fun name _ (pc, _) (closures, blocks, free_pc) ->
+      (fun name _ (pc, _) (closures, p) ->
         let traverse outer =
           Code.traverse
             { fold = Code.fold_children }
-            (inline live_vars closures)
+            (inline live_vars closures name)
             pc
-            blocks
-            (outer, blocks, free_pc)
+            p.blocks
+            (outer, p)
         in
         match name with
         | None ->
-            let _, blocks, free_pc = traverse (optimizable blocks pc true) in
-            closures, blocks, free_pc
+            let _, p = traverse (optimizable p.blocks pc true) in
+            closures, p
         | Some x ->
-            let l, c, outer = Var.Map.find x closures in
-            let outer, blocks, free_pc = traverse outer in
-            let closures = Var.Map.add x (l, c, outer) closures in
-            closures, blocks, free_pc)
-      (closures, p.blocks, p.free_pc)
+            let info = Var.Map.find x closures in
+            let outer, p = traverse info.cl_prop in
+            let closures = Var.Map.add x { info with cl_prop = outer } closures in
+            closures, p)
+      (closures, p)
   in
   if times () then Format.eprintf "  inlining: %a@." Timer.print t;
-  let p = { p with blocks; free_pc } in
   Code.invariant p;
   p
