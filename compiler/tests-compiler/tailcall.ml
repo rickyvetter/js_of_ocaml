@@ -62,7 +62,7 @@ let%expect_test _ =
      function odd(x){return caml_trampoline(odd$0(0, x));}
      function even(x){return caml_trampoline(even$0(0, x));}
      var _c_ = even(1);
-     if(odd(1) === _c_)
+     if(Object.is(odd(1), _c_))
       throw caml_maybe_attach_backtrace([0, Assert_failure, _b_], 1);
      try{odd(5000); var _d_ = log_success(0); return _d_;}
      catch(_e_){return caml_call1(log_failure, cst_too_much_recursion);}
@@ -103,7 +103,7 @@ let%expect_test _ =
      function odd(x){return caml_trampoline(odd$0(x));}
      function even(x){return caml_trampoline(even$0(x));}
      var _c_ = even(1);
-     if(odd(1) === _c_)
+     if(Object.is(odd(1), _c_))
       throw caml_maybe_attach_backtrace([0, Assert_failure, _b_], 1);
      try{odd(5000); var _d_ = log_success(0); return _d_;}
      catch(_e_){return caml_call1(log_failure, cst_too_much_recursion);}

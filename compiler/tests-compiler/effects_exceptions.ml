@@ -57,10 +57,17 @@ let%expect_test "test-compiler/lib-effects/test1.ml" =
     {|
 
     function exceptions(s, cont){
+<<<<<<< HEAD
      try{var _n_ = runtime.caml_int_of_string(s), n = _n_;}
      catch(_r_){
       var _i_ = caml_wrap_exception(_r_);
       if(_i_[1] !== Stdlib[7]){
+=======
+     try{var _p_ = runtime.caml_int_of_string(s), n = _p_;}
+     catch(_t_){
+      var _i_ = caml_wrap_exception(_t_);
+      if(! Object.is(_i_[1], Stdlib[7])){
+>>>>>>> c650ced771 (promote)
        var raise$1 = caml_pop_trap();
        return raise$1(caml_maybe_attach_backtrace(_i_, 0));
       }
@@ -71,17 +78,28 @@ let%expect_test "test-compiler/lib-effects/test1.ml" =
        throw caml_maybe_attach_backtrace(Stdlib[8], 1);
       var _m_ = 7, m = _m_;
      }
+<<<<<<< HEAD
      catch(_q_){
       var _j_ = caml_wrap_exception(_q_);
       if(_j_ !== Stdlib[8]){
+=======
+     catch(_s_){
+      var _k_ = caml_wrap_exception(_s_);
+      if(! Object.is(_k_, Stdlib[8])){
+>>>>>>> c650ced771 (promote)
        var raise$0 = caml_pop_trap();
        return raise$0(caml_maybe_attach_backtrace(_j_, 0));
       }
       var m = 0;
      }
      caml_push_trap
+<<<<<<< HEAD
       (function(_p_){
         if(_p_ === Stdlib[8]) return cont(0);
+=======
+      (function(_r_){
+        if(Object.is(_r_, Stdlib[8])) return cont(0);
+>>>>>>> c650ced771 (promote)
         var raise = caml_pop_trap();
         return raise(caml_maybe_attach_backtrace(_p_, 0));
        });
