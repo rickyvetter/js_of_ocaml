@@ -85,7 +85,7 @@ let%expect_test "test-compiler/lib-effects/test1.ml" =
                            undef,
                            function(_d_){
                             var _e_ = i + 1 | 0;
-                            if(5 !== i) return caml_cps_exact_call1(_c_, _e_);
+                            if(! Object.is(5, i)) return caml_cps_exact_call1(_c_, _e_);
                             caml_callback(g, [undef]);
                             var Test = [0];
                             runtime.caml_register_global(2, Test, "Test");

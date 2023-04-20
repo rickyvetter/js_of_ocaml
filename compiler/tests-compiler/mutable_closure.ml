@@ -124,26 +124,26 @@ let%expect_test _ =
        closures =
          function(i){
           function f(counter, n){
-           if(- 1 === n){
+           if(Object.is(- 1, n)){
             var _j_ = - 2;
             if(counter >= 50) return caml_trampoline_return(g, [0, _j_]);
             var counter$1 = counter + 1 | 0;
             return g(counter$1, _j_);
            }
-           if(0 === n) return i;
+           if(Object.is(0, n)) return i;
            var _k_ = n - 1 | 0;
            if(counter >= 50) return caml_trampoline_return(g, [0, _k_]);
            var counter$0 = counter + 1 | 0;
            return g(counter$0, _k_);
           }
           function g(counter, n){
-           if(- 1 === n){
+           if(Object.is(- 1, n)){
             var _h_ = - 2;
             if(counter >= 50) return caml_trampoline_return(f, [0, _h_]);
             var counter$1 = counter + 1 | 0;
             return f(counter$1, _h_);
            }
-           if(0 === n) return i;
+           if(Object.is(0, n)) return i;
            var _i_ = n - 1 | 0;
            if(counter >= 50) return caml_trampoline_return(f, [0, _i_]);
            var counter$0 = counter + 1 | 0;
@@ -162,7 +162,7 @@ let%expect_test _ =
       indirect[1] =
        [0, function(i, f){return function(param){return f(i);};}(i, f), _f_];
       var _g_ = i + 1 | 0;
-      if(3 === i){
+      if(Object.is(3, i)){
        var
         _d_ = indirect[1],
         indirect$0 =
