@@ -567,79 +567,13 @@ let enqueue expr_queue prop x ce loc cardinal acc =
 
 (****)
 
-module Interm : sig
-  type elt =
-    { pc : Addr.t
-    ; var : Var.t
-    ; value : int
-    ; default : bool
-    }
-
-  type t
-
-  val empty : t
-
-  val mem : Addr.t -> t -> bool
-
-  val find : Addr.t -> t -> elt
-
-  val add : t -> idx:Addr.t -> var:Var.t -> (Addr.t * int * bool) list -> t
-
-  val resolve_nodes : t -> Addr.Set.t -> Addr.Set.t
-end = struct
-  type elt =
-    { pc : Addr.t
-    ; var : Var.t
-    ; value : int
-    ; default : bool
-    }
-
-  type t = elt Addr.Map.t
-
-  let empty = Addr.Map.empty
-
-  let mem pc t = Addr.Map.mem pc t
-
-  let find pc t = Addr.Map.find pc t
-
-  let add t ~idx ~var members =
-    List.fold_left members ~init:t ~f:(fun acc (pc, value, default) ->
-        Addr.Map.add pc { pc = idx; var; value; default } acc)
-
-  let rec resolve_node interm pc =
-    try
-      let int = find pc interm in
-      resolve_node interm int.pc
-    with Not_found -> pc
-
-  let resolve_nodes interm s =
-    Addr.Set.fold (fun pc s' -> Addr.Set.add (resolve_node interm pc) s') s Addr.Set.empty
-end
-
 type state =
-  { succs :
-      (Addr.t, int list) Hashtbl.t (* List of forward successors for a given block *)
-  ; backs : (Addr.t, Addr.Set.t) Hashtbl.t (* Set of back edges for a given block *)
-  ; preds : (Addr.t, int) Hashtbl.t (* Number of predecessors for a given block *)
-  ; seen : (Addr.t, int) Hashtbl.t
-        (* For blocks that are member of a frontier, it's the number of predecessor already compiled *)
-  ; loops : Addr.Set.t
-        (* Set of blocks that are start a loop / have incoming back edges *)
+  { graph : Structure.control_flow_graph
+  ; dom : (int, Code.Addr.Set.t) Hashtbl.t
   ; visited_blocks : Addr.Set.t ref
-  ; dominance_frontier_cache : (Addr.t, int Addr.Map.t) Hashtbl.t
-        (* dominance_frontier of a block. The frontier is a map containing number of edges to each member of the frontier. *)
-  ; last_interm_idx : int ref
   ; ctx : Ctx.t
   ; blocks : Code.block Addr.Map.t
   }
-
-let get_preds st pc = Hashtbl.find st.preds pc
-
-let get_succs st pc = Hashtbl.find st.succs pc
-
-let get_seen st pc = try Hashtbl.find st.seen pc with Not_found -> 0
-
-let incr_seen st pc = Hashtbl.replace st.seen pc (get_seen st pc + 1)
 
 module DTree = struct
   (* This as to be kept in sync with the way we build conditionals
@@ -654,7 +588,7 @@ module DTree = struct
   type 'a t =
     | If of cond * 'a t * 'a t
     | Switch of (int list * 'a t) array
-    | Branch of 'a
+    | Branch of 'a * int list
     | Empty
 
   let normalize a =
@@ -666,30 +600,44 @@ module DTree = struct
     |> List.sort ~cmp:(fun (_, l1) (_, l2) -> compare (List.length l1) (List.length l2))
     |> Array.of_list
 
-  let build_if b1 b2 = If (IsTrue, Branch b1, Branch b2)
+  let build_if b1 b2 = If (IsTrue, Branch (b1, [ 1 ]), Branch (b2, [ 0 ]))
 
   let build_switch (a : cont array) : 'a t =
-    let m = Config.Param.switch_max_case () in
+    let m = Config.Param.switch_max_case () * 3 in
     let ai = Array.mapi a ~f:(fun i x -> x, i) in
     (* group the contiguous cases with the same continuation *)
     let ai : (Code.cont * int list) array =
       Array.of_list (list_group fst snd (Array.to_list ai))
     in
+    if debug ()
+    then
+      Array.iter ai ~f:(fun ((pc, args), cases) ->
+          Format.eprintf
+            "Group cases (%a) -> %d %a@;"
+            (Format.pp_print_list
+               ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
+               (fun fmt case -> Format.fprintf fmt "%d" case))
+            cases
+            pc
+            (Format.pp_print_list
+               ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
+               (fun fmt a -> Code.Var.print fmt a))
+            args);
     let rec loop low up =
       let array_norm : (Code.cont * int list) array =
         normalize (Array.sub ai ~pos:low ~len:(up - low + 1))
       in
       let array_len = Array.length array_norm in
       if array_len = 1 (* remaining cases all jump to the same branch *)
-      then Branch (fst array_norm.(0))
+      then Branch (fst array_norm.(0), snd array_norm.(0))
       else
         try
           (* try to optimize when there are only 2 branch *)
           match array_norm with
-          | [| (b1, [ i1 ]); (b2, _l2) |] ->
-              If (CEq (Int32.of_int i1), Branch b1, Branch b2)
-          | [| (b1, _l1); (b2, [ i2 ]) |] ->
-              If (CEq (Int32.of_int i2), Branch b2, Branch b1)
+          | [| (b1, [ i1 ]); (b2, l2) |] ->
+              If (CEq (Int32.of_int i1), Branch (b1, [ i1 ]), Branch (b2, l2))
+          | [| (b1, l1); (b2, [ i2 ]) |] ->
+              If (CEq (Int32.of_int i2), Branch (b2, [ i2 ]), Branch (b1, l1))
           | [| (b1, l1); (b2, l2) |] ->
               let bound l1 =
                 match l1, List.rev l1 with
@@ -699,9 +647,9 @@ module DTree = struct
               let min1, max1 = bound l1 in
               let min2, max2 = bound l2 in
               if max1 < min2
-              then If (CLt (Int32.of_int max1), Branch b2, Branch b1)
+              then If (CLt (Int32.of_int max1), Branch (b2, l2), Branch (b1, l1))
               else if max2 < min1
-              then If (CLt (Int32.of_int max2), Branch b1, Branch b2)
+              then If (CLt (Int32.of_int max2), Branch (b1, l1), Branch (b2, l2))
               else raise Not_found
           | _ -> raise Not_found
         with Not_found -> (
@@ -712,7 +660,7 @@ module DTree = struct
             nbcases := !nbcases + List.length (snd array_norm.(i))
           done;
           if !nbcases <= m
-          then Switch (Array.map array_norm ~f:(fun (x, l) -> l, Branch x))
+          then Switch (Array.map array_norm ~f:(fun (x, l) -> l, Branch (x, l)))
           else
             let h = (up + low) / 2 in
             let b1 = loop low h and b2 = loop (succ h) up in
@@ -723,16 +671,6 @@ module DTree = struct
     in
     let len = Array.length ai in
     if len = 0 then Empty else loop 0 (len - 1)
-
-  let rec fold_cont f b acc =
-    match b with
-    | If (_, b1, b2) ->
-        let acc = fold_cont f b1 acc in
-        let acc = fold_cont f b2 acc in
-        acc
-    | Switch a -> Array.fold_left a ~init:acc ~f:(fun acc (_, b) -> fold_cont f b acc)
-    | Branch (pc, _) -> f pc acc
-    | Empty -> acc
 
   let nbcomp a =
     let rec loop c = function
@@ -750,149 +688,13 @@ module DTree = struct
     loop 0 a
 end
 
-let fold_children blocks pc f accu =
-  let block = Addr.Map.find pc blocks in
-  match fst block.branch with
-  | Return _ | Raise _ | Stop -> accu
-  | Branch (pc', _) | Poptrap (pc', _) -> f pc' accu
-  | Pushtrap ((pc1, _), _, (pc2, _), _) ->
-      let accu = f pc1 accu in
-      let accu = f pc2 accu in
-      accu
-  | Cond (_, cont1, cont2) -> DTree.fold_cont f (DTree.build_if cont1 cont2) accu
-  | Switch (_, a1, a2) ->
-      let a1 = DTree.build_switch a1 and a2 = DTree.build_switch a2 in
-      let accu = DTree.fold_cont f a1 accu in
-      let accu = DTree.fold_cont f a2 accu in
-      accu
-
 let build_graph ctx pc =
   let visited_blocks = ref Addr.Set.empty in
-  let loops = ref Addr.Set.empty in
-  let succs = Hashtbl.create 17 in
-  let poptrap = Hashtbl.create 17 in
-  let backs = Hashtbl.create 17 in
-  let preds = Hashtbl.create 17 in
-  let seen = Hashtbl.create 17 in
   let blocks = ctx.Ctx.blocks in
-  let dominance_frontier_cache = Hashtbl.create 17 in
-  let incr_prec pc =
-    match Hashtbl.find preds pc with
-    | exception Not_found -> Hashtbl.add preds pc 1
-    | n -> Hashtbl.replace preds pc (succ n)
-  in
-  let add_cf_frontier pc front =
-    let prev = Hashtbl.find succs pc in
-    Addr.Set.iter incr_prec front;
-    Hashtbl.replace succs pc (Addr.Set.elements front @ prev)
-  in
-  let rec loop pc anc pushtrap =
-    if not (Addr.Set.mem pc !visited_blocks)
-    then (
-      visited_blocks := Addr.Set.add pc !visited_blocks;
-      let anc = Addr.Set.add pc anc in
-      let s = Code.fold_children blocks pc Addr.Set.add Addr.Set.empty in
-      let pc_backs = Addr.Set.inter s anc in
-      Hashtbl.add backs pc pc_backs;
-      let s = fold_children blocks pc (fun x l -> x :: l) [] in
-      let pc_succs = List.filter s ~f:(fun pc -> not (Addr.Set.mem pc anc)) in
-      let b = Addr.Map.find pc blocks in
-      Hashtbl.add succs pc pc_succs;
-      Addr.Set.iter (fun pc' -> loops := Addr.Set.add pc' !loops) pc_backs;
-      List.iter pc_succs ~f:(fun pc' ->
-          let pushtrap =
-            match fst b.branch with
-            | Pushtrap ((pc1, _), _, (pc2, _), _remove) ->
-                if pc' = pc1
-                then (
-                  Hashtbl.add poptrap pc Addr.Set.empty;
-                  pc :: pushtrap)
-                else (
-                  assert (pc' = pc2);
-                  pushtrap)
-            | Poptrap (pc1, _) -> (
-                match pushtrap with
-                | [] -> assert false
-                | p :: rest ->
-                    let old = Hashtbl.find poptrap p in
-                    Hashtbl.replace poptrap p (Addr.Set.add pc1 old);
-                    rest)
-            | _ -> pushtrap
-          in
-          loop pc' anc pushtrap);
-      List.iter pc_succs ~f:incr_prec)
-  in
-  loop pc Addr.Set.empty [];
-  Hashtbl.add preds pc 1;
-  let () =
-    (* Create an artificial frontier when we pop an exception handler *)
-    let rec keep_front pc =
-      if Hashtbl.find preds pc > 1
-      then (* already part of a merge node *) false
-      else
-        match Addr.Map.find pc blocks with
-        | { body = []; branch = Return _, _; _ } -> false
-        | { body = []; branch = Stop, _; _ } -> false
-        | { body = []; branch = Branch (pc', _), _; _ } -> keep_front pc'
-        | _ -> true
-    in
-    Hashtbl.iter
-      (fun pc_pushtrap pc3 ->
-        let pc3 = Addr.Set.filter keep_front pc3 in
-        add_cf_frontier pc_pushtrap pc3)
-      poptrap
-  in
-  { visited_blocks
-  ; dominance_frontier_cache
-  ; seen
-  ; loops = !loops
-  ; succs
-  ; backs
-  ; preds
-  ; last_interm_idx = ref (-1)
-  ; ctx
-  ; blocks
-  }
-
-let rec frontier_of_pc st pc =
-  match Hashtbl.find st.dominance_frontier_cache pc with
-  | d -> d
-  | exception Not_found ->
-      let visited = frontier_of_succs st (get_succs st pc) in
-      Hashtbl.add st.dominance_frontier_cache pc visited;
-      visited
-
-and frontier_of_succs st succs =
-  let visited = ref Addr.Map.empty in
-  let q = Queue.create () in
-  let incr pc n = Queue.add (Addr.Map.singleton pc n) q in
-  List.iter succs ~f:(fun pc -> incr pc 1);
-  while not (Queue.is_empty q) do
-    visited :=
-      Addr.Map.merge
-        (fun k a b ->
-          let sum = Option.value ~default:0 a + Option.value ~default:0 b in
-          if get_preds st k = sum
-          then (
-            Queue.add (frontier_of_pc st k) q;
-            None)
-          else Some sum)
-        !visited
-        (Queue.take q)
-  done;
-  !visited
-
-(* [seen] can be used to specify how many predecessor have been
-   handled already. It is used when compiling merge_nodes. *)
-let dominance_frontier ?(seen = 1) st pc =
-  let pred = get_preds st pc in
-  assert (pred >= seen);
-  if pred > seen
-  then Addr.Set.singleton pc
-  else
-    (* pred = seen *)
-    let grey = frontier_of_pc st pc in
-    Addr.Map.fold (fun k _ acc -> Addr.Set.add k acc) grey Addr.Set.empty
+  let graph = Structure.build_graph blocks pc in
+  let idom = Structure.dominator_tree graph in
+  let dom = Structure.reverse_tree idom in
+  { visited_blocks; graph; dom; ctx; blocks }
 
 (****)
 
@@ -1570,27 +1372,27 @@ and translate_instrs ctx expr_queue instr last =
       st @ instrs, expr_queue
 
 (* Compile loops. *)
-and compile_block st queue (pc : Addr.t) loop_stack frontier interm =
+and compile_block st queue (pc : Addr.t) scope_stack ~fall_through =
   if (not (List.is_empty queue))
-     && (Addr.Set.mem pc st.loops || not (Config.Flag.inline ()))
+     && (Structure.is_loop_header st.graph pc || not (Config.Flag.inline ()))
   then
-    let never, code = compile_block st [] pc loop_stack frontier interm in
+    let never, code = compile_block st [] pc scope_stack ~fall_through in
     never, flush_all queue code
   else
-    match Addr.Set.mem pc st.loops with
-    | false -> compile_block_no_loop st queue pc loop_stack frontier interm
+    match Structure.is_loop_header st.graph pc with
+    | false -> compile_block_no_loop st queue pc scope_stack ~fall_through
     | true ->
         if debug () then Format.eprintf "@[<hv 2>for(;;) {@,";
         let never_body, body =
           let lab =
-            match loop_stack with
+            match scope_stack with
             | (_, (l, _)) :: _ -> J.Label.succ l
             | [] -> J.Label.zero
           in
           let lab_used = ref false in
-          let loop_stack = (pc, (lab, lab_used)) :: loop_stack in
+          let scope_stack = (pc, (lab, lab_used)) :: scope_stack in
           let never_body, body =
-            compile_block_no_loop st queue pc loop_stack frontier interm
+            compile_block_no_loop st queue pc scope_stack ~fall_through:pc
           in
           let body =
             let rec remove_tailing_continue acc = function
@@ -1606,7 +1408,7 @@ and compile_block st queue (pc : Addr.t) loop_stack frontier interm =
                 , None
                 , None
                 , Js_simpl.block
-                    (if never_body
+                    (if never_body || true
                      then (
                        if debug () then Format.eprintf "}@]@,";
                        body)
@@ -1626,165 +1428,96 @@ and compile_block st queue (pc : Addr.t) loop_stack frontier interm =
         never_body, body
 
 (* Compile block. Loops have already been handled. *)
-and compile_block_no_loop st queue (pc : Addr.t) loop_stack frontier interm =
+and compile_block_no_loop st queue (pc : Addr.t) ~fall_through scope_stack =
   if pc < 0 then assert false;
   if Addr.Set.mem pc !(st.visited_blocks)
   then (
-    Format.eprintf "Trying to compile a block twice !!!! %d@." pc;
-    assert false);
-  let seen = get_seen st pc and pred = get_preds st pc in
-  if seen > pred
-  then (
-    Format.eprintf "This block has too many incoming edges. !!!! %d@." pc;
-    assert false);
-  if seen < pred
-  then (
     Format.eprintf
-      "Trying to compile %d, but some (%d) of its predecessors have not been compiled \
-       yet. !!!!."
+      "Trying to compile a block twice !!!! %d %b@."
       pc
-      (pred - seen);
+      (Structure.is_merge_node st.graph pc);
     assert false);
-  assert (seen = pred);
+  if debug () then Format.eprintf "Compiling block %d@;" pc;
   st.visited_blocks := Addr.Set.add pc !(st.visited_blocks);
-  if debug () then Format.eprintf "block %d; frontier: %s;@," pc (string_of_set frontier);
   let block = Addr.Map.find pc st.blocks in
   let seq, queue = translate_instrs st.ctx queue block.body block.branch in
-  let new_frontier =
-    List.fold_left
-      (get_succs st pc)
-      ~f:(fun acc pc ->
-        let grey = dominance_frontier st pc in
-        Addr.Set.union acc grey)
-      ~init:Addr.Set.empty
+  let label =
+    match scope_stack with
+    | (_, (l, _)) :: _ -> J.Label.succ l
+    | [] -> J.Label.zero
   in
-  let prefix, frontier_cont, new_interm, merge_node =
-    colapse_frontier "default" st new_frontier interm
+  let is_switch pc =
+    match fst block.branch with
+    | Switch (_, a, b) ->
+        let c = ref 0 in
+        Array.iter a ~f:(fun (pc', _) -> if pc = pc' then incr c);
+        Array.iter b ~f:(fun (pc', _) -> if pc = pc' then incr c);
+        !c > 1
+    | Cond (_, (pc1, _), (pc2, _)) -> pc1 = pc && pc2 = pc
+    | _ -> false
   in
-  List.iter (get_succs st pc) ~f:(fun pc -> incr_seen st pc);
-  (* Beware evaluation order! *)
-  let never_cond, cond =
-    compile_conditional
-      st
-      queue
-      block.branch
-      loop_stack
-      (Hashtbl.find st.backs pc)
-      (Addr.Set.union frontier frontier_cont)
-      new_interm
-  in
-  let never_after, after =
-    compile_merge_node st frontier_cont loop_stack frontier interm merge_node
-  in
-  never_cond || never_after, seq @ prefix @ cond @ after
 
-(* Compile a merge_node if present *)
-and compile_merge_node
-    st
-    (pc : Addr.Set.t)
-    loop_stack
-    (frontier : Addr.Set.t)
-    interm
-    merge_node =
-  assert (Addr.Set.cardinal pc <= 1);
-  match Addr.Set.choose_opt pc, merge_node with
-  | None, Some _ -> assert false
-  | None, None -> (* Nothing to compile *) false, []
-  | Some pc, None ->
-      (* merge node with a one block frontier *)
-      compile_branch st [] (pc, []) loop_stack Addr.Set.empty frontier interm
-  | Some _, Some (members, branch) ->
-      (* merge node *)
-      let new_frontier =
-        members
-        |> List.map ~f:(fun pc ->
-               if Addr.Set.mem pc frontier
-               then Addr.Set.singleton pc
-               else
-                 let seen = get_seen st pc in
-                 dominance_frontier ~seen st pc)
-        |> List.fold_left ~init:Addr.Set.empty ~f:Addr.Set.union
-      in
-      (* The frontier has to move when compiling a merge node. Fail early instead of infinite recursion. *)
-      if List.for_all members ~f:(fun pc -> Addr.Set.mem pc new_frontier)
-      then assert false;
-      let prefix, frontier_cont, new_interm, merge_node =
-        colapse_frontier "merge_node" st new_frontier interm
-      in
-      let never_cond, cond =
-        compile_conditional
-          st
-          []
-          branch
-          loop_stack
-          Addr.Set.empty
-          (Addr.Set.union frontier frontier_cont)
-          new_interm
-      in
-      let never_after, after =
-        compile_merge_node st frontier_cont loop_stack frontier interm merge_node
-      in
-      never_cond || never_after, prefix @ cond @ after
-
-and colapse_frontier name st (new_frontier' : Addr.Set.t) interm =
-  let new_frontier = Interm.resolve_nodes interm new_frontier' in
-  if debug ()
+  let new_scopes =
+    Structure.get_edges st.dom pc
+    |> Addr.Set.elements
+    |> List.filter ~f:(fun pc' -> is_switch pc' || Structure.is_merge_node st.graph pc')
+  in
+  if debug () && not (List.is_empty new_scopes)
   then
     Format.eprintf
-      "Resolve %s to %s;@,"
-      (string_of_set new_frontier')
-      (string_of_set new_frontier);
-  if Addr.Set.cardinal new_frontier <= 1
-  then [], new_frontier, interm, None
-  else
-    let idx =
-      decr st.last_interm_idx;
-      !(st.last_interm_idx)
-    in
-    if debug ()
-    then
-      Format.eprintf
-        "colapse frontier(%s) into %d: %s@,"
-        name
-        idx
-        (string_of_set new_frontier);
-    let x = Code.Var.fresh_n "switch" in
-    let a =
-      Addr.Set.elements new_frontier
-      |> List.map ~f:(fun pc -> pc, get_preds st pc - get_seen st pc)
-      |> List.sort ~cmp:(fun (pc1, (c1 : int)) (pc2, (c2 : int)) ->
-             match compare c2 c1 with
-             | 0 -> compare pc1 pc2
-             | c -> c)
-      |> List.map ~f:fst
-    in
-    if debug () then Format.eprintf "var %a;@," Code.Var.print x;
-    Hashtbl.add st.succs idx a;
-    Hashtbl.add st.preds idx (List.length a);
-    let pc_i = List.mapi a ~f:(fun i pc -> pc, i) in
-    let default = 0 in
-    let interm =
-      Interm.add interm ~idx ~var:x (List.map pc_i ~f:(fun (pc, i) -> pc, i, default = i))
-    in
-    let branch =
-      let cases = Array.of_list (List.map a ~f:(fun pc -> pc, [])) in
-      if Array.length cases > 2
-      then Code.Switch (x, cases, [||]), Code.noloc
-      else Code.Cond (x, cases.(1), cases.(0)), Code.noloc
-    in
-    ( [ J.variable_declaration [ J.V x, (int default, J.N) ], J.N ]
-    , Addr.Set.singleton idx
-    , interm
-    , Some (a, branch) )
+      "@[<hv 2>Setup scopes: %a@,"
+      Format.(
+        pp_print_list
+          ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
+          (fun fmt pc -> Format.fprintf fmt "%d" pc))
+      new_scopes;
+  let _label, scope_stack =
+    List.fold_left
+      ~init:(label, scope_stack)
+      ~f:(fun (label, scope_stack) pc ->
+        J.Label.succ label, (pc, (label, ref false)) :: scope_stack)
+      new_scopes
+  in
+  let rec loop ~fall_through l =
+    match l with
+    | [] ->
+        let never_cond, cond =
+          compile_conditional st queue ~src:pc ~fall_through block.branch scope_stack
+        in
+        never_cond, cond
+    | x :: xs ->
+        let never_inner, inner = loop ~fall_through:x xs in
+        let never, code = compile_block st [] x scope_stack ~fall_through in
+        let l, used = List.assoc x scope_stack in
+        let code =
+          if !used
+          then [ J.Labelled_statement (l, (J.Block inner, J.N)), J.N ] @ code
+          else inner @ code
+        in
+        never_inner && never, code
+  in
 
-and compile_decision_tree st loop_stack backs frontier interm loc cx dtree =
+  let never_after, after = loop ~fall_through (List.rev new_scopes) in
+  if debug () && not (List.is_empty new_scopes) then Format.eprintf "@]End of scope@;";
+  never_after, seq @ after
+
+and compile_decision_tree st scope_stack ~src loc cx dtree kind ~fall_through =
   (* Some changes here may require corresponding changes
      in function [DTree.fold_cont] above. *)
   let rec loop cx : _ -> bool * _ = function
     | DTree.Empty -> assert false
-    | DTree.Branch cont ->
-        if debug () then Format.eprintf "@[<hv 2>case {@;";
-        let never, code = compile_branch st [] cont loop_stack backs frontier interm in
+    | DTree.Branch (cont, l) ->
+        if debug ()
+        then
+          Format.eprintf
+            "@[<hv 2>case %s(%a)  {@;"
+            kind
+            Format.(
+              pp_print_list
+                ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
+                (fun fmt pc -> Format.fprintf fmt "%d" pc))
+            l;
+        let never, code = compile_branch st [] cont scope_stack ~src ~fall_through in
         if debug () then Format.eprintf "}@]@;";
         never, code
     | DTree.If (cond, cont1, cont2) ->
@@ -1839,7 +1572,7 @@ and compile_decision_tree st loop_stack backs frontier interm loc cx dtree =
   let never, code = loop cx dtree in
   never, binds @ code
 
-and compile_conditional st queue last loop_stack backs frontier interm =
+and compile_conditional st queue ~src ~fall_through last scope_stack : _ * _ =
   let last, pc = last in
   (if debug ()
    then
@@ -1852,7 +1585,7 @@ and compile_conditional st queue last loop_stack backs frontier interm =
      | Cond (x, _, _) -> Format.eprintf "@[<hv 2>cond(%a){@;" Code.Var.print x
      | Switch (x, _, _) -> Format.eprintf "@[<hv 2>switch(%a){@;" Code.Var.print x);
   let loc = source_location st.ctx pc in
-  let res =
+  let res : _ * _ =
     match last with
     | Return x ->
         let (_px, cx), queue = access_queue queue x in
@@ -1865,12 +1598,12 @@ and compile_conditional st queue last loop_stack backs frontier interm =
           if st.ctx.Ctx.should_export then Some (s_var Constant.exports) else None
         in
         true, flush_all queue [ J.Return_statement e_opt, loc ]
-    | Branch cont -> compile_branch st queue cont loop_stack backs frontier interm
+    | Branch cont -> compile_branch st queue cont scope_stack ~src ~fall_through
     | Pushtrap (c1, x, e1, _) ->
-        let never_body, body = compile_branch st [] c1 loop_stack backs frontier interm in
+        let never_body, body = compile_branch st [] c1 scope_stack ~src ~fall_through in
         if debug () then Format.eprintf "@,}@]@,@[<hv 2>catch {@;";
         let never_handler, handler =
-          compile_branch st [] e1 loop_stack backs frontier interm
+          compile_branch st [] e1 scope_stack ~src ~fall_through
         in
         let exn_var, handler =
           assert (not (List.mem x ~set:(snd e1)));
@@ -1896,20 +1629,20 @@ and compile_conditional st queue last loop_stack backs frontier interm =
               , loc )
             ] )
     | Poptrap cont ->
-        let never, code = compile_branch st [] cont loop_stack backs frontier interm in
+        let never, code = compile_branch st [] cont scope_stack ~src ~fall_through in
         never, flush_all queue code
     | Cond (x, c1, c2) ->
         let (_px, cx), queue = access_queue queue x in
         let never, b =
           compile_decision_tree
             st
-            loop_stack
-            backs
-            frontier
-            interm
+            scope_stack
+            ~src
+            ~fall_through
             loc
             cx
             (DTree.build_if c1 c2)
+            "I"
         in
         never, flush_all queue b
     | Switch (x, [||], a2) ->
@@ -1917,13 +1650,13 @@ and compile_conditional st queue last loop_stack backs frontier interm =
         let never, code =
           compile_decision_tree
             st
-            loop_stack
-            backs
-            frontier
-            interm
+            scope_stack
+            ~src
+            ~fall_through
             loc
             (Mlvalue.Block.tag cx)
             (DTree.build_switch a2)
+            "B"
         in
         never, flush_all queue code
     | Switch (x, a1, [||]) ->
@@ -1931,13 +1664,13 @@ and compile_conditional st queue last loop_stack backs frontier interm =
         let never, code =
           compile_decision_tree
             st
-            loop_stack
-            backs
-            frontier
-            interm
+            scope_stack
+            ~src
+            ~fall_through
             loc
             cx
             (DTree.build_switch a1)
+            "I"
         in
         never, flush_all queue code
     | Switch (x, a1, a2) ->
@@ -1946,24 +1679,24 @@ and compile_conditional st queue last loop_stack backs frontier interm =
         let never1, b1 =
           compile_decision_tree
             st
-            loop_stack
-            backs
-            frontier
-            interm
+            scope_stack
+            ~src
+            ~fall_through
             loc
             (var x)
             (DTree.build_switch a1)
+            "I"
         in
         let never2, b2 =
           compile_decision_tree
             st
-            loop_stack
-            backs
-            frontier
-            interm
+            scope_stack
+            ~src
+            ~fall_through
             loc
             (Mlvalue.Block.tag (var x))
             (DTree.build_switch a2)
+            "B"
         in
         let code =
           Js_simpl.if_statement
@@ -1983,20 +1716,19 @@ and compile_conditional st queue last loop_stack backs frontier interm =
      | Switch _ | Cond _ | Pushtrap _ -> Format.eprintf "}@]@;");
   res
 
-and compile_argument_passing ctx queue (pc, args) _backs continuation =
+and compile_argument_passing ctx queue (pc, args) continuation =
   if List.is_empty args
   then continuation queue
   else
     let block = Addr.Map.find pc ctx.Ctx.blocks in
     parallel_renaming block.params args continuation queue
 
-and compile_branch st queue ((pc, _) as cont) loop_stack backs frontier interm : bool * _
-    =
-  compile_argument_passing st.ctx queue cont backs (fun queue ->
-      if Addr.Set.mem pc backs
+and compile_branch st queue ((pc, _) as cont) scope_stack ~src ~fall_through : bool * _ =
+  compile_argument_passing st.ctx queue cont (fun queue ->
+      if src >= 0 && Structure.is_backward st.graph src pc
       then (
         let label =
-          match loop_stack with
+          match scope_stack with
           | [] -> assert false
           | (pc', _) :: rem ->
               if pc = pc'
@@ -2012,32 +1744,29 @@ and compile_branch st queue ((pc, _) as cont) loop_stack backs frontier interm :
           then Format.eprintf "continue;@,"
           else Format.eprintf "continue (%d);@," pc;
         true, flush_all queue [ J.Continue_statement label, J.N ])
-      else if Addr.Set.mem pc frontier || Interm.mem pc interm
-      then (
-        if debug () then Format.eprintf "(br %d)@;" pc;
-        false, flush_all queue (compile_branch_selection pc interm))
-      else compile_block st queue pc loop_stack frontier interm)
-
-and compile_branch_selection pc interm =
-  try
-    let { Interm.pc; var = x; value = i; default } = Interm.find pc interm in
-    if debug () then Format.eprintf "%a=%d;@;" Code.Var.print x i;
-    let branch = compile_branch_selection pc interm in
-    if default
-    then branch
-    else (J.Expression_statement (EBin (Eq, EVar (J.V x), int i)), J.N) :: branch
-  with Not_found -> []
+      else if List.mem_assoc pc ~map:scope_stack
+      then
+        if pc = fall_through
+        then false, flush_all queue []
+        else (
+          if debug () then Format.eprintf "(br %d)@;" pc;
+          let l, used = List.assoc pc scope_stack in
+          used := true;
+          true, flush_all queue [ J.Break_statement (Some l), J.N ])
+      else compile_block st queue pc scope_stack ~fall_through)
 
 and compile_closure ctx (pc, args) =
   let st = build_graph ctx pc in
-  let current_blocks = !(st.visited_blocks) in
-  st.visited_blocks := Addr.Set.empty;
+  let current_blocks =
+    List.fold_left
+      ~init:Addr.Set.empty
+      ~f:(fun s pc -> Addr.Set.add pc s)
+      st.graph.reverse_post_order
+  in
   if debug () then Format.eprintf "@[<hv 2>closure {@;";
-  let backs = Addr.Set.empty in
-  let loop_stack = [] in
-  incr_seen st pc;
+  let scope_stack = [] in
   let _never, res =
-    compile_branch st [] (pc, args) loop_stack backs Addr.Set.empty Interm.empty
+    compile_branch st [] (pc, args) scope_stack ~src:(-1) ~fall_through:(-1)
   in
   if Addr.Set.cardinal !(st.visited_blocks) <> Addr.Set.cardinal current_blocks
   then (
