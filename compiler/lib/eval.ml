@@ -341,14 +341,13 @@ let eval_branch info (l, loc) =
           | Zero -> Branch ffalse
           | Non_zero -> Branch ftrue
           | Unknown -> b)
-    | Switch (x, const, tags) as b -> (
+    | Switch (x, const) as b -> (
         (* [the_case_of info (Pv x)] might be meaningless when we're inside a dead code.
            The proper fix would be to remove the deadcode entirely.
            Meanwhile, add guards to prevent Invalid_argument("index out of bounds")
            see https://github.com/ocsigen/js_of_ocaml/issues/485 *)
         match the_case_of info (Pv x) with
         | CConst j when j >= 0 && j < Array.length const -> Branch const.(j)
-        | CTag j when j >= 0 && j < Array.length tags -> Branch tags.(j)
         | CConst _ | CTag _ | Unknown -> b)
     | _ as b -> b
   in
@@ -380,13 +379,9 @@ let rec do_not_raise pc visited blocks =
         let visited = do_not_raise pc1 visited blocks in
         let visited = do_not_raise pc2 visited blocks in
         visited
-    | Switch (_, a1, a2) ->
+    | Switch (_, a1) ->
         let visited =
           Array.fold_left a1 ~init:visited ~f:(fun visited (pc, _) ->
-              do_not_raise pc visited blocks)
-        in
-        let visited =
-          Array.fold_left a2 ~init:visited ~f:(fun visited (pc, _) ->
               do_not_raise pc visited blocks)
         in
         visited

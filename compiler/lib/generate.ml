@@ -890,6 +890,7 @@ let _ =
   register_un_prim_ctx "%caml_format_int_special" `Pure (fun ctx cx loc ->
       let s = J.EBin (J.Plus, str_js_utf8 "", cx) in
       ocaml_string ~ctx ~loc s);
+  register_un_prim "%direct_obj_tag" `Mutator (fun cx _loc -> Mlvalue.Block.tag cx);
   register_bin_prim "caml_array_unsafe_get" `Mutable (fun cx cy _ ->
       Mlvalue.Array.field cx cy);
   register_bin_prim "%int_add" `Pure (fun cx cy _ -> to_int (plus_int cx cy));
@@ -1415,10 +1416,9 @@ and compile_block_no_loop st queue (pc : Addr.t) ~fall_through scope_stack =
   let seq, queue = translate_instrs st.ctx queue block.body block.branch in
   let is_switch pc =
     match fst block.branch with
-    | Switch (_, a, b) ->
+    | Switch (_, a) ->
         let c = ref 0 in
         Array.iter a ~f:(fun (pc', _) -> if pc = pc' then incr c);
-        Array.iter b ~f:(fun (pc', _) -> if pc = pc' then incr c);
         !c > 1
     | Cond (_, (pc1, _), (pc2, _)) -> pc1 = pc && pc2 = pc
     | _ -> false
@@ -1531,7 +1531,7 @@ and compile_conditional st queue ~src ~fall_through last scope_stack : _ * _ =
      | Raise _ -> Format.eprintf "raise;@;"
      | Stop -> Format.eprintf "stop;@;"
      | Cond (x, _, _) -> Format.eprintf "@[<hv 2>cond(%a){@;" Code.Var.print x
-     | Switch (x, _, _) -> Format.eprintf "@[<hv 2>switch(%a){@;" Code.Var.print x);
+     | Switch (x, _) -> Format.eprintf "@[<hv 2>switch(%a){@;" Code.Var.print x);
   let loc = source_location st.ctx pc in
   let res : _ * _ =
     match last with
@@ -1593,21 +1593,7 @@ and compile_conditional st queue ~src ~fall_through last scope_stack : _ * _ =
             "I"
         in
         never, flush_all queue b
-    | Switch (x, [||], a2) ->
-        let (_px, cx), queue = access_queue queue x in
-        let never, code =
-          compile_decision_tree
-            st
-            scope_stack
-            ~src
-            ~fall_through
-            loc
-            (Mlvalue.Block.tag cx)
-            (DTree.build_switch a2)
-            "B"
-        in
-        never, flush_all queue code
-    | Switch (x, a1, [||]) ->
+    | Switch (x, a1) ->
         let (_px, cx), queue = access_queue queue x in
         let never, code =
           compile_decision_tree
@@ -1621,41 +1607,6 @@ and compile_conditional st queue ~src ~fall_through last scope_stack : _ * _ =
             "I"
         in
         never, flush_all queue code
-    | Switch (x, a1, a2) ->
-        (* The variable x is accessed several times, so we can directly
-           refer to it *)
-        let never1, b1 =
-          compile_decision_tree
-            st
-            scope_stack
-            ~src
-            ~fall_through
-            loc
-            (var x)
-            (DTree.build_switch a1)
-            "I"
-        in
-        let never2, b2 =
-          compile_decision_tree
-            st
-            scope_stack
-            ~src
-            ~fall_through
-            loc
-            (Mlvalue.Block.tag (var x))
-            (DTree.build_switch a2)
-            "B"
-        in
-        let code =
-          Js_simpl.if_statement
-            (Mlvalue.is_immediate (var x))
-            loc
-            (Js_simpl.block b1)
-            never1
-            (Js_simpl.block b2)
-            never2
-        in
-        never1 && never2, flush_all queue code
   in
   (if debug ()
    then

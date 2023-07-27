@@ -850,10 +850,9 @@ let rec compile_block blocks debug_data code pc state =
     | Cond (_, (pc1, _), (pc2, _)) ->
         compile_block blocks debug_data code pc1 state';
         compile_block blocks debug_data code pc2 state'
-    | Switch (_, l1, l2) ->
-        Array.iter l1 ~f:(fun (pc', _) -> compile_block blocks debug_data code pc' state');
-        Array.iter l2 ~f:(fun (pc', _) -> compile_block blocks debug_data code pc' state')
-    | Pushtrap _ | Raise _ | Return _ | Stop -> ())
+    | Switch (_, _) -> ()
+    | Pushtrap _ -> ()
+    | Raise _ | Return _ | Stop -> ())
 
 and compile infos pc state instrs =
   if debug_parser () then State.print state;
@@ -1630,20 +1629,67 @@ and compile infos pc state instrs =
         let x, _ = State.accu state in
         let args = State.stack_vars state in
         instrs, (Cond (x, (pc + 2, args), (pc + offset + 1, args)), loc), state
-    | SWITCH ->
+    | SWITCH -> (
         if debug_parser () then Format.printf "switch ...@.";
 
         let sz = getu code (pc + 1) in
         let x, _ = State.accu state in
         let args = State.stack_vars state in
         let l = sz land 0xFFFF in
+        let isize = sz land 0XFFFF in
+        let bsize = sz lsr 16 in
         let it =
           Array.init (sz land 0XFFFF) ~f:(fun i -> pc + 2 + gets code (pc + 2 + i), args)
         in
         let bt =
           Array.init (sz lsr 16) ~f:(fun i -> pc + 2 + gets code (pc + 2 + l + i), args)
         in
-        instrs, (Switch (x, it, bt), loc), state
+        Array.iter it ~f:(fun (pc', _) ->
+            compile_block infos.blocks infos.debug code pc' state);
+        Array.iter bt ~f:(fun (pc', _) ->
+            compile_block infos.blocks infos.debug code pc' state);
+        match isize, bsize with
+        | _, 0 -> instrs, (Switch (x, it), loc), state
+        | 0, _ ->
+            let x_tag = Var.fresh () in
+            let instrs =
+              (Let (x_tag, Prim (Extern "%direct_obj_tag", [ Pv x ])), loc) :: instrs
+            in
+            instrs, (Switch (x_tag, bt), loc), state
+        | _, _ ->
+            let isint_branch = pc + 1 in
+            let isblock_branch = pc + 2 in
+            let i_state = State.start_block isint_branch state in
+            let i_args = State.stack_vars i_state in
+            let b_state = State.start_block isblock_branch state in
+            let b_args = State.stack_vars b_state in
+            tagged_blocks := Addr.Set.add isint_branch !tagged_blocks;
+            tagged_blocks := Addr.Set.add isblock_branch !tagged_blocks;
+            let it = Array.map it ~f:(fun (x, _) -> x, i_args) in
+            let bt = Array.map bt ~f:(fun (x, _) -> x, b_args) in
+            let x_tag = Var.fresh () in
+            let () =
+              compiled_blocks :=
+                Addr.Map.add
+                  isint_branch
+                  (i_state, [], (Switch (x, it), loc))
+                  !compiled_blocks
+            in
+            let () =
+              let instrs =
+                [ Let (x_tag, Prim (Extern "%direct_obj_tag", [ Pv x ])), loc ]
+              in
+              compiled_blocks :=
+                Addr.Map.add
+                  isblock_branch
+                  (b_state, instrs, (Switch (x_tag, bt), loc))
+                  !compiled_blocks
+            in
+            let isint_var = Var.fresh () in
+            let instrs = (Let (isint_var, Prim (IsInt, [ Pv x ])), loc) :: instrs in
+            ( instrs
+            , (Cond (isint_var, (isint_branch, args), (isblock_branch, args)), loc)
+            , state ))
     | BOOLNOT ->
         let y, _ = State.accu state in
         let x, state = State.fresh_var state loc in

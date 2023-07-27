@@ -17940,10 +17940,10 @@
    function output_acc(o, acc){
      /*<<camlinternalFormat.ml:1897:27>>*/ var acc$0 = acc;
      /*<<camlinternalFormat.ml:1897:27>>*/ for(;;){
+     if(typeof acc$0 === "number")
+       /*<<camlinternalFormat.ml:1912:32>>*/ return 0;
      a:
      {
-      if(typeof acc$0 === "number")
-        /*<<camlinternalFormat.ml:1912:32>>*/ return 0;
       switch(acc$0[0]){
         case 0:
           /*<<camlinternalFormat.ml:1899:12>>*/ var
@@ -18003,10 +18003,10 @@
    function bufput_acc(b, acc){
      /*<<camlinternalFormat.ml:1917:27>>*/ var acc$0 = acc;
      /*<<camlinternalFormat.ml:1917:27>>*/ for(;;){
+     if(typeof acc$0 === "number")
+       /*<<camlinternalFormat.ml:1932:32>>*/ return 0;
      a:
      {
-      if(typeof acc$0 === "number")
-        /*<<camlinternalFormat.ml:1932:32>>*/ return 0;
       switch(acc$0[0]){
         case 0:
           /*<<camlinternalFormat.ml:1919:12>>*/ var
@@ -18063,10 +18063,10 @@
    function strput_acc(b, acc){
      /*<<camlinternalFormat.ml:1938:27>>*/ var acc$0 = acc;
      /*<<camlinternalFormat.ml:1938:27>>*/ for(;;){
+     if(typeof acc$0 === "number")
+       /*<<camlinternalFormat.ml:1953:32>>*/ return 0;
      a:
      {
-      if(typeof acc$0 === "number")
-        /*<<camlinternalFormat.ml:1953:32>>*/ return 0;
       switch(acc$0[0]){
         case 0:
           /*<<camlinternalFormat.ml:1940:12>>*/ var
@@ -25512,39 +25512,38 @@
      left_total = match$0[1],
       /*<<format.ml:479:4>>*/ size = queue_elem[1];
     if(left_total < state[12]) return initialize_scan_stack(state[1]);
+    var _bI_ = queue_elem[2];
     b:
-    {
-     var _bI_ = queue_elem[2];
-     if(typeof _bI_ !== "number")
-      switch(_bI_[0]){
-        case 3:
-         var
-          _bK_ = 1 - ty,
-          _bL_ =
-            _bK_
-             ? (queue_elem
-                [1]
-               = state[13] + size | 0,
-                /*<<format.ml:493:10>>*/ caml_call1(Stdlib_Stack[5], state[1]),
-               0)
-             : _bK_;
-          /*<<format.ml:493:10>>*/ return _bL_;
-        case 1:
-        case 2:
-         break b;
-      }
-      /*<<format.ml:497:8>>*/ return 0;
+    if(typeof _bI_ !== "number"){
+     switch(_bI_[0]){
+       case 3:
+        var
+         _bK_ = 1 - ty,
+         _bL_ =
+           _bK_
+            ? (queue_elem
+               [1]
+              = state[13] + size | 0,
+               /*<<format.ml:493:10>>*/ caml_call1(Stdlib_Stack[5], state[1]),
+              0)
+            : _bK_;
+         /*<<format.ml:493:10>>*/ return _bL_;
+       case 1:
+       case 2: break;
+       default: break b;
+     }
+     var
+      _bJ_ =
+        ty
+         ? (queue_elem
+            [1]
+           = state[13] + size | 0,
+            /*<<format.ml:488:10>>*/ caml_call1(Stdlib_Stack[5], state[1]),
+           0)
+         : ty;
+      /*<<format.ml:488:10>>*/ return _bJ_;
     }
-    var
-     _bJ_ =
-       ty
-        ? (queue_elem
-           [1]
-          = state[13] + size | 0,
-           /*<<format.ml:488:10>>*/ caml_call1(Stdlib_Stack[5], state[1]),
-          0)
-        : ty;
-     /*<<format.ml:488:10>>*/ return _bJ_;
+     /*<<format.ml:497:8>>*/ return 0;
     /*<<format.ml:497:10>>*/ }
    function scan_push(state, b, token){
      /*<<format.ml:503:2>>*/ pp_enqueue(state, token);
@@ -26796,97 +26795,96 @@
     }
     /*<<format.ml:1344:75>>*/ }
    function output_acc(ppf, acc){
-     /*<<format.ml:1350:29>>*/ b:
+     /*<<format.ml:1350:29>>*/ if(typeof acc === "number")
+      /*<<format.ml:1376:32>>*/ return 0;
+    b:
     {
      a:
      {
       c:
       {
        d:
-       {
-        if(typeof acc === "number")  /*<<format.ml:1376:32>>*/ return 0;
-        switch(acc[0]){
-          case 0:
-           var f = acc[2], p = acc[1];
-            /*<<format.ml:1360:4>>*/ output_acc(ppf, p);
-            /*<<format.ml:1360:4>>*/ return output_formatting_lit(ppf, f);
-          case 1:
-           var match = acc[2], p$0 = acc[1];
-           if(0 === match[0]){
-            var acc$0 = match[1];
-             /*<<format.ml:1363:4>>*/ output_acc(ppf, p$0);
-             /*<<format.ml:1364:21>>*/ return pp_open_stag
-                    (ppf, [0, String_tag, compute_tag(output_acc, acc$0)]);
+       switch(acc[0]){
+         case 0:
+          var f = acc[2], p = acc[1];
+           /*<<format.ml:1360:4>>*/ output_acc(ppf, p);
+           /*<<format.ml:1360:4>>*/ return output_formatting_lit(ppf, f);
+         case 1:
+          var match = acc[2], p$0 = acc[1];
+          if(0 === match[0]){
+           var acc$0 = match[1];
+            /*<<format.ml:1363:4>>*/ output_acc(ppf, p$0);
+            /*<<format.ml:1364:21>>*/ return pp_open_stag
+                   (ppf, [0, String_tag, compute_tag(output_acc, acc$0)]);
+          }
+          var acc$1 = match[1];
+           /*<<format.ml:1366:4>>*/ output_acc(ppf, p$0);
+           /*<<format.ml:1367:43>>*/ var
+            /*<<format.ml:1367:43>>*/ _$_ = compute_tag(output_acc, acc$1),
+            /*<<format.ml:1367:24>>*/ match$0 =
+              /*<<format.ml:1367:24>>*/ caml_call1
+              (CamlinternalFormat[20], _$_),
+           bty = match$0[2],
+           indent = match$0[1];
+           /*<<format.ml:1368:4>>*/ return pp_open_box_gen(ppf, indent, bty);
+         case 2:
+          var _aa_ = acc[1];
+          if(typeof _aa_ !== "number" && 0 === _aa_[0]){
+           var _ab_ = _aa_[2];
+           if(typeof _ab_ !== "number" && 1 === _ab_[0]){
+            var s$0 = acc[2], size = _ab_[2], p$2 = _aa_[1];
+            break a;
            }
-           var acc$1 = match[1];
-            /*<<format.ml:1366:4>>*/ output_acc(ppf, p$0);
-            /*<<format.ml:1367:43>>*/ var
-             /*<<format.ml:1367:43>>*/ _$_ = compute_tag(output_acc, acc$1),
-             /*<<format.ml:1367:24>>*/ match$0 =
-               /*<<format.ml:1367:24>>*/ caml_call1
-               (CamlinternalFormat[20], _$_),
-            bty = match$0[2],
-            indent = match$0[1];
-            /*<<format.ml:1368:4>>*/ return pp_open_box_gen(ppf, indent, bty);
-          case 2:
-           var _aa_ = acc[1];
-           if(typeof _aa_ !== "number" && 0 === _aa_[0]){
-            var _ab_ = _aa_[2];
-            if(typeof _ab_ !== "number" && 1 === _ab_[0]){
-             var s$0 = acc[2], size = _ab_[2], p$2 = _aa_[1];
-             break a;
-            }
+          }
+          var s = acc[2], p$1 = _aa_;
+          break b;
+         case 3:
+          var _ac_ = acc[1];
+          if(typeof _ac_ !== "number" && 0 === _ac_[0]){
+           var _ad_ = _ac_[2];
+           if(typeof _ad_ !== "number" && 1 === _ad_[0]){
+            var c$0 = acc[2], size$0 = _ad_[2], p$4 = _ac_[1];
+            break d;
            }
-           var s = acc[2], p$1 = _aa_;
-           break b;
-          case 3:
-           var _ac_ = acc[1];
-           if(typeof _ac_ !== "number" && 0 === _ac_[0]){
-            var _ad_ = _ac_[2];
-            if(typeof _ad_ !== "number" && 1 === _ad_[0]){
-             var c$0 = acc[2], size$0 = _ad_[2], p$4 = _ac_[1];
-             break d;
-            }
+          }
+          var c = acc[2], p$3 = _ac_;
+          break c;
+         case 4:
+          var _ae_ = acc[1];
+          if(typeof _ae_ !== "number" && 0 === _ae_[0]){
+           var _af_ = _ae_[2];
+           if(typeof _af_ !== "number" && 1 === _af_[0]){
+            var s$0 = acc[2], size = _af_[2], p$2 = _ae_[1];
+            break a;
            }
-           var c = acc[2], p$3 = _ac_;
-           break c;
-          case 4:
-           var _ae_ = acc[1];
-           if(typeof _ae_ !== "number" && 0 === _ae_[0]){
-            var _af_ = _ae_[2];
-            if(typeof _af_ !== "number" && 1 === _af_[0]){
-             var s$0 = acc[2], size = _af_[2], p$2 = _ae_[1];
-             break a;
-            }
+          }
+          var s = acc[2], p$1 = _ae_;
+          break b;
+         case 5:
+          var _ag_ = acc[1];
+          if(typeof _ag_ !== "number" && 0 === _ag_[0]){
+           var _ah_ = _ag_[2];
+           if(typeof _ah_ !== "number" && 1 === _ah_[0]){
+            var c$0 = acc[2], size$0 = _ah_[2], p$4 = _ag_[1];
+            break d;
            }
-           var s = acc[2], p$1 = _ae_;
-           break b;
-          case 5:
-           var _ag_ = acc[1];
-           if(typeof _ag_ !== "number" && 0 === _ag_[0]){
-            var _ah_ = _ag_[2];
-            if(typeof _ah_ !== "number" && 1 === _ah_[0]){
-             var c$0 = acc[2], size$0 = _ah_[2], p$4 = _ag_[1];
-             break d;
-            }
-           }
-           var c = acc[2], p$3 = _ag_;
-           break c;
-          case 6:
-           var f$0 = acc[2], p$5 = acc[1];
-            /*<<format.ml:1373:32>>*/ output_acc(ppf, p$5);
-            /*<<format.ml:1373:32>>*/ return  /*<<format.ml:1373:32>>*/ caml_call1
-                   (f$0, ppf);
-          case 7:
-           var p$6 = acc[1];
-            /*<<format.ml:1374:32>>*/ output_acc(ppf, p$6);
-            /*<<format.ml:1374:32>>*/ return pp_print_flush(ppf, 0);
-          default:
-           var msg = acc[2], p$7 = acc[1];
-            /*<<format.ml:1375:32>>*/ output_acc(ppf, p$7);
-            /*<<format.ml:1375:32>>*/ return  /*<<format.ml:1375:32>>*/ caml_call1
-                   (Stdlib[1], msg);
-        }
+          }
+          var c = acc[2], p$3 = _ag_;
+          break c;
+         case 6:
+          var f$0 = acc[2], p$5 = acc[1];
+           /*<<format.ml:1373:32>>*/ output_acc(ppf, p$5);
+           /*<<format.ml:1373:32>>*/ return  /*<<format.ml:1373:32>>*/ caml_call1
+                  (f$0, ppf);
+         case 7:
+          var p$6 = acc[1];
+           /*<<format.ml:1374:32>>*/ output_acc(ppf, p$6);
+           /*<<format.ml:1374:32>>*/ return pp_print_flush(ppf, 0);
+         default:
+          var msg = acc[2], p$7 = acc[1];
+           /*<<format.ml:1375:32>>*/ output_acc(ppf, p$7);
+           /*<<format.ml:1375:32>>*/ return  /*<<format.ml:1375:32>>*/ caml_call1
+                  (Stdlib[1], msg);
        }
         /*<<format.ml:1357:4>>*/ output_acc(ppf, p$4);
         /*<<format.ml:1358:44>>*/ return pp_print_as_size
@@ -26905,107 +26903,106 @@
      /*<<format.ml:1370:32>>*/ return pp_print_string(ppf, s);
     /*<<format.ml:1376:34>>*/ }
    function strput_acc(ppf, acc){
-     /*<<format.ml:1382:29>>*/ b:
+     /*<<format.ml:1382:29>>*/ if(typeof acc === "number")
+      /*<<format.ml:1411:32>>*/ return 0;
+    b:
     {
      a:
      {
       c:
       {
        d:
-       {
-        if(typeof acc === "number")  /*<<format.ml:1411:32>>*/ return 0;
-        switch(acc[0]){
-          case 0:
-           var f = acc[2], p = acc[1];
-            /*<<format.ml:1395:4>>*/ strput_acc(ppf, p);
-            /*<<format.ml:1395:4>>*/ return output_formatting_lit(ppf, f);
-          case 1:
-           var match = acc[2], p$0 = acc[1];
-           if(0 === match[0]){
-            var acc$0 = match[1];
-             /*<<format.ml:1398:4>>*/ strput_acc(ppf, p$0);
-             /*<<format.ml:1399:21>>*/ return pp_open_stag
-                    (ppf, [0, String_tag, compute_tag(strput_acc, acc$0)]);
+       switch(acc[0]){
+         case 0:
+          var f = acc[2], p = acc[1];
+           /*<<format.ml:1395:4>>*/ strput_acc(ppf, p);
+           /*<<format.ml:1395:4>>*/ return output_formatting_lit(ppf, f);
+         case 1:
+          var match = acc[2], p$0 = acc[1];
+          if(0 === match[0]){
+           var acc$0 = match[1];
+            /*<<format.ml:1398:4>>*/ strput_acc(ppf, p$0);
+            /*<<format.ml:1399:21>>*/ return pp_open_stag
+                   (ppf, [0, String_tag, compute_tag(strput_acc, acc$0)]);
+          }
+          var acc$1 = match[1];
+           /*<<format.ml:1401:4>>*/ strput_acc(ppf, p$0);
+           /*<<format.ml:1402:43>>*/ var
+            /*<<format.ml:1402:43>>*/ _S_ = compute_tag(strput_acc, acc$1),
+            /*<<format.ml:1402:24>>*/ match$0 =
+              /*<<format.ml:1402:24>>*/ caml_call1
+              (CamlinternalFormat[20], _S_),
+           bty = match$0[2],
+           indent = match$0[1];
+           /*<<format.ml:1403:4>>*/ return pp_open_box_gen(ppf, indent, bty);
+         case 2:
+          var _T_ = acc[1];
+          if(typeof _T_ !== "number" && 0 === _T_[0]){
+           var _U_ = _T_[2];
+           if(typeof _U_ !== "number" && 1 === _U_[0]){
+            var s$0 = acc[2], size = _U_[2], p$2 = _T_[1];
+            break a;
            }
-           var acc$1 = match[1];
-            /*<<format.ml:1401:4>>*/ strput_acc(ppf, p$0);
-            /*<<format.ml:1402:43>>*/ var
-             /*<<format.ml:1402:43>>*/ _S_ = compute_tag(strput_acc, acc$1),
-             /*<<format.ml:1402:24>>*/ match$0 =
-               /*<<format.ml:1402:24>>*/ caml_call1
-               (CamlinternalFormat[20], _S_),
-            bty = match$0[2],
-            indent = match$0[1];
-            /*<<format.ml:1403:4>>*/ return pp_open_box_gen(ppf, indent, bty);
-          case 2:
-           var _T_ = acc[1];
-           if(typeof _T_ !== "number" && 0 === _T_[0]){
-            var _U_ = _T_[2];
-            if(typeof _U_ !== "number" && 1 === _U_[0]){
-             var s$0 = acc[2], size = _U_[2], p$2 = _T_[1];
-             break a;
-            }
+          }
+          var s = acc[2], p$1 = _T_;
+          break b;
+         case 3:
+          var _V_ = acc[1];
+          if(typeof _V_ !== "number" && 0 === _V_[0]){
+           var _W_ = _V_[2];
+           if(typeof _W_ !== "number" && 1 === _W_[0]){
+            var c$0 = acc[2], size$0 = _W_[2], p$4 = _V_[1];
+            break d;
            }
-           var s = acc[2], p$1 = _T_;
-           break b;
-          case 3:
-           var _V_ = acc[1];
-           if(typeof _V_ !== "number" && 0 === _V_[0]){
-            var _W_ = _V_[2];
-            if(typeof _W_ !== "number" && 1 === _W_[0]){
-             var c$0 = acc[2], size$0 = _W_[2], p$4 = _V_[1];
-             break d;
-            }
+          }
+          var c = acc[2], p$3 = _V_;
+          break c;
+         case 4:
+          var _X_ = acc[1];
+          if(typeof _X_ !== "number" && 0 === _X_[0]){
+           var _Y_ = _X_[2];
+           if(typeof _Y_ !== "number" && 1 === _Y_[0]){
+            var s$0 = acc[2], size = _Y_[2], p$2 = _X_[1];
+            break a;
            }
-           var c = acc[2], p$3 = _V_;
-           break c;
-          case 4:
-           var _X_ = acc[1];
-           if(typeof _X_ !== "number" && 0 === _X_[0]){
-            var _Y_ = _X_[2];
-            if(typeof _Y_ !== "number" && 1 === _Y_[0]){
-             var s$0 = acc[2], size = _Y_[2], p$2 = _X_[1];
-             break a;
-            }
+          }
+          var s = acc[2], p$1 = _X_;
+          break b;
+         case 5:
+          var _Z_ = acc[1];
+          if(typeof _Z_ !== "number" && 0 === _Z_[0]){
+           var ___ = _Z_[2];
+           if(typeof ___ !== "number" && 1 === ___[0]){
+            var c$0 = acc[2], size$0 = ___[2], p$4 = _Z_[1];
+            break d;
            }
-           var s = acc[2], p$1 = _X_;
-           break b;
-          case 5:
-           var _Z_ = acc[1];
-           if(typeof _Z_ !== "number" && 0 === _Z_[0]){
-            var ___ = _Z_[2];
-            if(typeof ___ !== "number" && 1 === ___[0]){
-             var c$0 = acc[2], size$0 = ___[2], p$4 = _Z_[1];
-             break d;
-            }
+          }
+          var c = acc[2], p$3 = _Z_;
+          break c;
+         case 6:
+          var p$5 = acc[1];
+          if(typeof p$5 !== "number" && 0 === p$5[0]){
+           var match$1 = p$5[2];
+           if(typeof match$1 !== "number" && 1 === match$1[0]){
+            var f$1 = acc[2], size$1 = match$1[2], p$6 = p$5[1];
+             /*<<format.ml:1392:4>>*/ strput_acc(ppf, p$6);
+             /*<<format.ml:1393:44>>*/ return pp_print_as_size
+                    (ppf, size$1,  /*<<format.ml:1393:44>>*/ caml_call1(f$1, 0));
            }
-           var c = acc[2], p$3 = _Z_;
-           break c;
-          case 6:
-           var p$5 = acc[1];
-           if(typeof p$5 !== "number" && 0 === p$5[0]){
-            var match$1 = p$5[2];
-            if(typeof match$1 !== "number" && 1 === match$1[0]){
-             var f$1 = acc[2], size$1 = match$1[2], p$6 = p$5[1];
-              /*<<format.ml:1392:4>>*/ strput_acc(ppf, p$6);
-              /*<<format.ml:1393:44>>*/ return pp_print_as_size
-                     (ppf, size$1,  /*<<format.ml:1393:44>>*/ caml_call1(f$1, 0));
-            }
-           }
-           var f$0 = acc[2];
-            /*<<format.ml:1408:32>>*/ strput_acc(ppf, p$5);
-            /*<<format.ml:1408:70>>*/ return pp_print_string
-                   (ppf,  /*<<format.ml:1408:70>>*/ caml_call1(f$0, 0));
-          case 7:
-           var p$7 = acc[1];
-            /*<<format.ml:1409:32>>*/ strput_acc(ppf, p$7);
-            /*<<format.ml:1409:32>>*/ return pp_print_flush(ppf, 0);
-          default:
-           var msg = acc[2], p$8 = acc[1];
-            /*<<format.ml:1410:32>>*/ strput_acc(ppf, p$8);
-            /*<<format.ml:1410:32>>*/ return  /*<<format.ml:1410:32>>*/ caml_call1
-                   (Stdlib[1], msg);
-        }
+          }
+          var f$0 = acc[2];
+           /*<<format.ml:1408:32>>*/ strput_acc(ppf, p$5);
+           /*<<format.ml:1408:70>>*/ return pp_print_string
+                  (ppf,  /*<<format.ml:1408:70>>*/ caml_call1(f$0, 0));
+         case 7:
+          var p$7 = acc[1];
+           /*<<format.ml:1409:32>>*/ strput_acc(ppf, p$7);
+           /*<<format.ml:1409:32>>*/ return pp_print_flush(ppf, 0);
+         default:
+          var msg = acc[2], p$8 = acc[1];
+           /*<<format.ml:1410:32>>*/ strput_acc(ppf, p$8);
+           /*<<format.ml:1410:32>>*/ return  /*<<format.ml:1410:32>>*/ caml_call1
+                  (Stdlib[1], msg);
        }
         /*<<format.ml:1389:4>>*/ strput_acc(ppf, p$4);
         /*<<format.ml:1390:44>>*/ return pp_print_as_size
@@ -27664,17 +27661,15 @@
     /*<<scanf.ml:381:45>>*/ }
    function close_in(ib){
      /*<<scanf.ml:385:4>>*/ var match = ib[9];
-    if(typeof match !== "number"){
-     if(0 === match[0]){
-      var ic = match[1];
-       /*<<scanf.ml:387:6>>*/ return  /*<<scanf.ml:387:6>>*/ caml_call1
-              (Stdlib[93], ic);
-     }
-     var ic$0 = match[2];
-      /*<<scanf.ml:388:32>>*/ return  /*<<scanf.ml:388:32>>*/ caml_call1
-             (Stdlib[93], ic$0);
+    if(typeof match === "number")  /*<<scanf.ml:389:37>>*/ return 0;
+    if(0 === match[0]){
+     var ic = match[1];
+      /*<<scanf.ml:387:6>>*/ return  /*<<scanf.ml:387:6>>*/ caml_call1
+             (Stdlib[93], ic);
     }
-     /*<<scanf.ml:389:37>>*/ return 0;
+    var ic$0 = match[2];
+     /*<<scanf.ml:388:32>>*/ return  /*<<scanf.ml:388:32>>*/ caml_call1
+            (Stdlib[93], ic$0);
     /*<<scanf.ml:389:39>>*/ }
     /*<<scanf.ml:403:0>>*/  /*<<scanf.ml:403:0>>*/ var
     Scan_failure =
@@ -30847,14 +30842,7 @@
           /*<<camlinternalMod.ml:83:25>>*/ shape =
            caml_check_bound(comps$0, i)[1 + i];
         d:
-        {
-         if(typeof shape !== "number"){
-          if(0 !== shape[0]) break d;
-          var comps = shape[1];
-           /*<<camlinternalMod.ml:78:5>>*/ update_mod_block
-           (comps, modu[1 + i], n$0);
-          break d;
-         }
+        if(typeof shape === "number"){
          if(2 === shape){
           if
            (0 ===  /*<<camlinternalMod.ml:72:13>>*/ caml_obj_tag(n$0)
@@ -30874,6 +30862,11 @@
                  ([0, Assert_failure, _a_], 1);
          }
           /*<<camlinternalMod.ml:68:5>>*/ modu[1 + i] = n$0;
+        }
+        else if(0 === shape[0]){
+         var comps = shape[1];
+          /*<<camlinternalMod.ml:78:5>>*/ update_mod_block
+          (comps, modu[1 + i], n$0);
         }
          /*<<camlinternalMod.ml:83:4>>*/  /*<<camlinternalMod.ml:83:4>>*/ var
          _f_ = i + 1 | 0;
