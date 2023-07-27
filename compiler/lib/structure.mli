@@ -1,32 +1,24 @@
 open! Stdlib
 open Code
 
-val reverse_tree : (Addr.t, 'a) Hashtbl.t -> ('a, Code.Addr.Set.t) Hashtbl.t
+type graph
 
-val get_edges : (int, Code.Addr.Set.t) Hashtbl.t -> int -> Code.Addr.Set.t
+type t
 
-type control_flow_graph =
-  { succs : (int, Code.Addr.Set.t) Hashtbl.t
-  ; preds : (int, Code.Addr.Set.t) Hashtbl.t
-  ; reverse_post_order : int list
-  ; block_order : (int, int) Hashtbl.t
-  }
+val get_edges : graph -> Addr.t -> Addr.Set.t
 
-val block_order : control_flow_graph -> int -> int
+val is_backward : t -> Addr.t -> Addr.t -> bool
 
-val is_backward : control_flow_graph -> int -> int -> bool
+val is_forward : t -> Addr.t -> Addr.t -> bool
 
-val is_forward : control_flow_graph -> int -> int -> bool
+val build_graph : block Addr.Map.t -> Addr.t -> t
 
-val build_graph : Code.block Code.Addr.Map.t -> int -> control_flow_graph
+val dominator_tree : t -> graph
 
-val dominator_tree : control_flow_graph -> (int, int) Hashtbl.t
+val is_merge_node : t -> Addr.t -> bool
 
-val dominates : control_flow_graph -> (int, int) Hashtbl.t -> int -> int -> bool
+val is_loop_header : t -> Addr.t -> bool
 
-val is_merge_node : control_flow_graph -> int -> bool
+val sort_in_post_order : t -> Addr.t list -> Addr.t list
 
-val is_loop_header : control_flow_graph -> int -> bool
-
-val dominance_frontier :
-  control_flow_graph -> (int, int) Hashtbl.t -> (int, Code.Addr.Set.t) Hashtbl.t
+val get_nodes : t -> Addr.Set.t

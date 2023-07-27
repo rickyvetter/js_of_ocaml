@@ -568,8 +568,8 @@ let enqueue expr_queue prop x ce loc cardinal acc =
 (****)
 
 type state =
-  { graph : Structure.control_flow_graph
-  ; dom : (int, Code.Addr.Set.t) Hashtbl.t
+  { structure : Structure.t
+  ; dom : Structure.graph
   ; visited_blocks : Addr.Set.t ref
   ; ctx : Ctx.t
   ; blocks : Code.block Addr.Map.t
@@ -691,10 +691,9 @@ end
 let build_graph ctx pc =
   let visited_blocks = ref Addr.Set.empty in
   let blocks = ctx.Ctx.blocks in
-  let graph = Structure.build_graph blocks pc in
-  let idom = Structure.dominator_tree graph in
-  let dom = Structure.reverse_tree idom in
-  { visited_blocks; graph; dom; ctx; blocks }
+  let structure = Structure.build_graph blocks pc in
+  let dom = Structure.dominator_tree structure in
+  { visited_blocks; structure; dom; ctx; blocks }
 
 (****)
 
@@ -1374,12 +1373,12 @@ and translate_instrs ctx expr_queue instr last =
 (* Compile loops. *)
 and compile_block st queue (pc : Addr.t) scope_stack ~fall_through =
   if (not (List.is_empty queue))
-     && (Structure.is_loop_header st.graph pc || not (Config.Flag.inline ()))
+     && (Structure.is_loop_header st.structure pc || not (Config.Flag.inline ()))
   then
     let never, code = compile_block st [] pc scope_stack ~fall_through in
     never, flush_all queue code
   else
-    match Structure.is_loop_header st.graph pc with
+    match Structure.is_loop_header st.structure pc with
     | false -> compile_block_no_loop st queue pc scope_stack ~fall_through
     | true ->
         if debug () then Format.eprintf "@[<hv 2>for(;;) {@,";
@@ -1435,7 +1434,7 @@ and compile_block_no_loop st queue (pc : Addr.t) ~fall_through scope_stack =
     Format.eprintf
       "Trying to compile a block twice !!!! %d %b@."
       pc
-      (Structure.is_merge_node st.graph pc);
+      (Structure.is_merge_node st.structure pc);
     assert false);
   if debug () then Format.eprintf "Compiling block %d@;" pc;
   st.visited_blocks := Addr.Set.add pc !(st.visited_blocks);
@@ -1460,9 +1459,9 @@ and compile_block_no_loop st queue (pc : Addr.t) ~fall_through scope_stack =
   let new_scopes =
     Structure.get_edges st.dom pc
     |> Addr.Set.elements
-    |> List.filter ~f:(fun pc' -> is_switch pc' || Structure.is_merge_node st.graph pc')
-    |> List.sort ~cmp:(fun a b ->
-           compare (Structure.block_order st.graph a) (Structure.block_order st.graph b))
+    |> List.filter ~f:(fun pc' ->
+           is_switch pc' || Structure.is_merge_node st.structure pc')
+    |> Structure.sort_in_post_order st.structure
   in
   if debug () && not (List.is_empty new_scopes)
   then
@@ -1727,7 +1726,7 @@ and compile_argument_passing ctx queue (pc, args) continuation =
 
 and compile_branch st queue ((pc, _) as cont) scope_stack ~src ~fall_through : bool * _ =
   compile_argument_passing st.ctx queue cont (fun queue ->
-      if src >= 0 && Structure.is_backward st.graph src pc
+      if src >= 0 && Structure.is_backward st.structure src pc
       then (
         let label =
           match scope_stack with
@@ -1759,12 +1758,7 @@ and compile_branch st queue ((pc, _) as cont) scope_stack ~src ~fall_through : b
 
 and compile_closure ctx (pc, args) =
   let st = build_graph ctx pc in
-  let current_blocks =
-    List.fold_left
-      ~init:Addr.Set.empty
-      ~f:(fun s pc -> Addr.Set.add pc s)
-      st.graph.reverse_post_order
-  in
+  let current_blocks = Structure.get_nodes st.structure in
   if debug () then Format.eprintf "@[<hv 2>closure {@;";
   let scope_stack = [] in
   let _never, res =

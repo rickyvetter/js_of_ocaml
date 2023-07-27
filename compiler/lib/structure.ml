@@ -23,12 +23,20 @@ let rec leave_try_body blocks pc =
   | { body = []; branch = Branch (pc', _), _; _ } -> leave_try_body blocks pc'
   | _ -> true
 
-type control_flow_graph =
+type graph = (Addr.t, Addr.Set.t) Hashtbl.t
+
+type t =
   { succs : (Addr.t, Addr.Set.t) Hashtbl.t
   ; preds : (Addr.t, Addr.Set.t) Hashtbl.t
   ; reverse_post_order : Addr.t list
   ; block_order : (Addr.t, int) Hashtbl.t
   }
+
+let get_nodes g =
+  List.fold_left
+    ~init:Addr.Set.empty
+    ~f:(fun s pc -> Addr.Set.add pc s)
+    g.reverse_post_order
 
 let block_order g pc = Hashtbl.find g.block_order pc
 
@@ -108,11 +116,7 @@ let dominator_tree g =
             let d = Hashtbl.find dom pc' in
             assert (inter pc d = d))
         l);
-  dom
-
-(* pc dominates pc' *)
-let rec dominates g idom pc pc' =
-  pc = pc' || (is_forward g pc pc' && dominates g idom pc (Hashtbl.find idom pc'))
+  reverse_tree dom
 
 (* pc has at least two forward edges moving into it *)
 let is_merge_node g pc =
@@ -131,6 +135,15 @@ let is_loop_header g pc =
   let o = Hashtbl.find g.block_order pc in
   Addr.Set.exists (fun pc' -> Hashtbl.find g.block_order pc' >= o) s
 
+let sort_in_post_order t l =
+  List.sort ~cmp:(fun a b -> compare (block_order t a) (block_order t b)) l
+
+(*
+
+(* pc dominates pc' *)
+let rec dominates g idom pc pc' =
+  pc = pc' || (is_forward g pc pc' && dominates g idom pc (Hashtbl.find idom pc'))
+
 let dominance_frontier g idom =
   let frontiers = Hashtbl.create 16 in
   Hashtbl.iter
@@ -147,3 +160,4 @@ let dominance_frontier g idom =
         Addr.Set.iter loop preds)
     g.preds;
   frontiers
+*)
