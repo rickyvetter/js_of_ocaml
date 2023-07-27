@@ -12,6 +12,8 @@ type control_flow_graph =
   ; block_order : (int, int) Hashtbl.t
   }
 
+val block_order : control_flow_graph -> int -> int
+
 val is_backward : control_flow_graph -> int -> int -> bool
 
 val is_forward : control_flow_graph -> int -> int -> bool

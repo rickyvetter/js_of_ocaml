@@ -1461,6 +1461,8 @@ and compile_block_no_loop st queue (pc : Addr.t) ~fall_through scope_stack =
     Structure.get_edges st.dom pc
     |> Addr.Set.elements
     |> List.filter ~f:(fun pc' -> is_switch pc' || Structure.is_merge_node st.graph pc')
+    |> List.sort ~cmp:(fun a b ->
+           compare (Structure.block_order st.graph a) (Structure.block_order st.graph b))
   in
   if debug () && not (List.is_empty new_scopes)
   then

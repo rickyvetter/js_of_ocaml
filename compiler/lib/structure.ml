@@ -30,6 +30,8 @@ type control_flow_graph =
   ; block_order : (Addr.t, int) Hashtbl.t
   }
 
+let block_order g pc = Hashtbl.find g.block_order pc
+
 let is_backward g pc pc' = Hashtbl.find g.block_order pc >= Hashtbl.find g.block_order pc'
 
 let is_forward g pc pc' = Hashtbl.find g.block_order pc < Hashtbl.find g.block_order pc'
