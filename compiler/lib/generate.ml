@@ -1430,14 +1430,14 @@ and compile_block_no_loop st queue (pc : Addr.t) ~fall_through scope_stack =
            is_switch pc' || Structure.is_merge_node st.structure pc')
     |> Structure.sort_in_post_order st.structure
   in
-  let rec loop scope_stack ~fall_through l =
+  let rec loop ~scope_stack ~fall_through l =
     match l with
     | [] -> compile_conditional st queue ~src:pc ~fall_through block.branch scope_stack
     | x :: xs ->
         let l = next_label scope_stack in
         let used = ref false in
         let scope_stack = (x, (l, used, Forward)) :: scope_stack in
-        let _never_inner, inner = loop scope_stack ~fall_through:x xs in
+        let _never_inner, inner = loop ~scope_stack ~fall_through:x xs in
         let never, code = compile_block st [] x scope_stack ~fall_through in
         let code =
           if !used
@@ -1447,7 +1447,7 @@ and compile_block_no_loop st queue (pc : Addr.t) ~fall_through scope_stack =
         never, code
   in
 
-  let never_after, after = loop ~fall_through (List.rev new_scopes) in
+  let never_after, after = loop ~scope_stack ~fall_through (List.rev new_scopes) in
   if debug () && not (List.is_empty new_scopes) then Format.eprintf "@]End of scope@;";
   never_after, seq @ after
 
