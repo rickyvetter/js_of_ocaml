@@ -319,23 +319,23 @@ end
      94:              ? 0 === pos ? cst_Raised_at : cst_Re_raised_at
      95:              : 0 === pos ? cst_Raised_by_primitive_operat : cst_Called_from;
      96:      /*<<test.ml:49:75>>*/ }
-     97:      /*<<test.ml:51:2>>*/ if(0 !== slot[0]){
-     98:      if(slot[1])  /*<<test.ml:54:50>>*/ return 0;
-     99:       /*<<test.ml:56:51>>*/  /*<<test.ml:56:51>>*/ var _o_ = info(0);
-    100:       /*<<test.ml:56:8>>*/ return [0,
-    101:               /*<<test.ml:56:13>>*/ caml_call2(Stdlib_Printf[4], _b_, _o_)];
-    102:     }
-    103:      /*<<test.ml:59:14>>*/ var
-    104:      _h_ = slot[5],
-    105:      _i_ = slot[4],
-    106:      _j_ = slot[3],
-    107:      _k_ = slot[6] ? cst_inlined : cst,
-    108:      _l_ = slot[2],
-    109:      _m_ = slot[7],
-    110:       /*<<test.ml:59:14>>*/ _n_ = info(slot[1]);
-    111:      /*<<test.ml:58:6>>*/ return [0,
-    112:              /*<<test.ml:58:11>>*/ caml_call8
-    113:              (Stdlib_Printf[4], _a_, _n_, _m_, _l_, _k_, _j_, _i_, _h_)];
+     97:      /*<<test.ml:51:2>>*/ if(0 === slot[0]){
+     98:       /*<<test.ml:59:14>>*/ var
+     99:       _h_ = slot[5],
+    100:       _i_ = slot[4],
+    101:       _j_ = slot[3],
+    102:       _k_ = slot[6] ? cst_inlined : cst,
+    103:       _l_ = slot[2],
+    104:       _m_ = slot[7],
+    105:        /*<<test.ml:59:14>>*/ _n_ = info(slot[1]);
+    106:       /*<<test.ml:58:6>>*/ return [0,
+    107:               /*<<test.ml:58:11>>*/ caml_call8
+    108:               (Stdlib_Printf[4], _a_, _n_, _m_, _l_, _k_, _j_, _i_, _h_)];
+    109:     }
+    110:     if(slot[1])  /*<<test.ml:54:50>>*/ return 0;
+    111:      /*<<test.ml:56:51>>*/  /*<<test.ml:56:51>>*/ var _o_ = info(0);
+    112:      /*<<test.ml:56:8>>*/ return [0,
+    113:              /*<<test.ml:56:13>>*/ caml_call2(Stdlib_Printf[4], _b_, _o_)];
     114:     /*<<test.ml:61:52>>*/ }
     115:    function print_exception_backtrace(outchan, backtrace){
     116:      /*<<test.ml:64:2>>*/ if(! backtrace)

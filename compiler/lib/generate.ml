@@ -1405,19 +1405,9 @@ and compile_block st queue (pc : Addr.t) scope_stack ~fall_through =
             in
             remove_tailing_continue [] body
           in
+          if debug () then Format.eprintf "}@]@,";
           let for_loop =
-            ( J.For_statement
-                ( J.Left None
-                , None
-                , None
-                , Js_simpl.block
-                    (if never_body || true
-                     then (
-                       if debug () then Format.eprintf "}@]@,";
-                       body)
-                     else (
-                       if debug () then Format.eprintf "break;@;}@]@,";
-                       body @ [ J.Break_statement None, J.N ])) )
+            ( J.For_statement (J.Left None, None, None, Js_simpl.block body)
             , source_location st.ctx (Code.location_of_pc pc) )
           in
           let label = if !lab_used then Some lab else None in
@@ -1485,13 +1475,9 @@ and compile_block_no_loop st queue (pc : Addr.t) ~fall_through scope_stack =
   in
   let rec loop ~fall_through l =
     match l with
-    | [] ->
-        let never_cond, cond =
-          compile_conditional st queue ~src:pc ~fall_through block.branch scope_stack
-        in
-        never_cond, cond
+    | [] -> compile_conditional st queue ~src:pc ~fall_through block.branch scope_stack
     | x :: xs ->
-        let never_inner, inner = loop ~fall_through:x xs in
+        let _never_inner, inner = loop ~fall_through:x xs in
         let never, code = compile_block st [] x scope_stack ~fall_through in
         let l, used, _ = List.assoc x scope_stack in
         let code =
@@ -1499,7 +1485,7 @@ and compile_block_no_loop st queue (pc : Addr.t) ~fall_through scope_stack =
           then [ J.Labelled_statement (l, (J.Block inner, J.N)), J.N ] @ code
           else inner @ code
         in
-        never_inner && never, code
+        never, code
   in
 
   let never_after, after = loop ~fall_through (List.rev new_scopes) in

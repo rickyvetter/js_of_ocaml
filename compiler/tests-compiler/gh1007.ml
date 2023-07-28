@@ -319,10 +319,10 @@ let ()  = M.myfun M.x
          },
        len = 0,
        param = l;
-      for(;;)
-       if(param)
-        var l$0 = param[2], len$0 = len + 1 | 0, len = len$0, param = l$0;
-       else{if(2 <= len) sort(len, l); var x$0 = next; continue a;}
+      for(;;){
+       if(! param){if(2 <= len) sort(len, l); var x$0 = next; continue a;}
+       var l$0 = param[2], len$0 = len + 1 | 0, len = len$0, param = l$0;
+      }
      }
     }
     //end |}]

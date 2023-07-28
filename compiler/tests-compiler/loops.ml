@@ -335,8 +335,7 @@ in loop x
         return _a_ + 2 | 0;
        }
       }
-      else
-       var x$2 = x$1 + 1 | 0, x$1 = x$2;
+      var x$2 = x$1 + 1 | 0, x$1 = x$2;
      }
     }
     //end |}]
@@ -457,27 +456,28 @@ let add_substitute =
            i$2 = start;
           for(;;){
            b:
-           if(lim$0 <= i$2)
-            var stop$0 = lim$0;
-           else{
-            var match = caml_string_get(s, i$2);
-            c:
-            {
-             if(91 <= match){
-              if(97 <= match){
-               if(123 > match) break c;
+           {
+            if(lim$0 > i$2){
+             var match = caml_string_get(s, i$2);
+             c:
+             {
+              if(91 <= match){
+               if(97 <= match){
+                if(123 > match) break c;
+               }
+               else if(95 === match) break c;
               }
-              else if(95 === match) break c;
+              else if(58 <= match){
+               if(65 <= match) break c;
+              }
+              else if(48 <= match) break c;
+              var stop$0 = i$2;
+              break b;
              }
-             else if(58 <= match){
-              if(65 <= match) break c;
-             }
-             else if(48 <= match) break c;
-             var stop$0 = i$2;
-             break b;
+             var i$3 = i$2 + 1 | 0, i$2 = i$3;
+             continue;
             }
-            var i$3 = i$2 + 1 | 0, i$2 = i$3;
-            continue;
+            var stop$0 = lim$0;
            }
            var
             match$0 =
