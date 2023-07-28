@@ -1006,6 +1006,11 @@ let throw_statement ctx cx k loc =
         , loc )
       ]
 
+let next_label scope_stack =
+  match scope_stack with
+  | (_, (l, _, _)) :: _ -> J.Label.succ l
+  | [] -> J.Label.zero
+
 let rec translate_expr ctx queue loc x e level : _ * J.statement_list =
   match e with
   | Apply { f; args; exact } ->
@@ -1387,11 +1392,7 @@ and compile_block st queue (pc : Addr.t) scope_stack ~fall_through =
     | true ->
         if debug () then Format.eprintf "@[<hv 2>for(;;) {@,";
         let never_body, body =
-          let lab =
-            match scope_stack with
-            | (_, (l, _, _)) :: _ -> J.Label.succ l
-            | [] -> J.Label.zero
-          in
+          let lab = next_label scope_stack in
           let lab_used = ref false in
           let scope_stack = (pc, (lab, lab_used, Backward)) :: scope_stack in
           let never_body, body =
@@ -1426,11 +1427,7 @@ and compile_block_no_loop st queue (pc : Addr.t) ~fall_through scope_stack =
   st.visited_blocks := Addr.Set.add pc !(st.visited_blocks);
   let block = Addr.Map.find pc st.blocks in
   let seq, queue = translate_instrs st.ctx queue block.body block.branch in
-  let label =
-    match scope_stack with
-    | (_, (l, _, _)) :: _ -> J.Label.succ l
-    | [] -> J.Label.zero
-  in
+  let label = next_label scope_stack in
   let is_switch pc =
     match fst block.branch with
     | Switch (_, a, b) ->
