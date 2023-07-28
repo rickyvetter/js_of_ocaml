@@ -47,7 +47,7 @@ let test t v =
 
 let%expect_test _ =
   test json ([ 1; 2; 3 ], Some 1., str);
-  [%expect{||}]
+  [%expect {||}]
 
 type intseq =
   | Z
