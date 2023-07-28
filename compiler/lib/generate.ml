@@ -1731,7 +1731,7 @@ and compile_argument_passing ctx queue (pc, args) continuation =
 and compile_branch st queue ((pc, _) as cont) scope_stack ~src ~fall_through : bool * _ =
   compile_argument_passing st.ctx queue cont (fun queue ->
       if src >= 0 && Structure.is_backward st.structure src pc
-      then (
+      then
         let rec get_label scope_stack =
           match scope_stack with
           | [] -> assert false
@@ -1745,12 +1745,15 @@ and compile_branch st queue ((pc, _) as cont) scope_stack ~src ~fall_through : b
                 Some lab
         in
         let label = get_label scope_stack in
-        if debug ()
-        then
-          if Option.is_none label
-          then Format.eprintf "continue;@,"
-          else Format.eprintf "continue (%d);@," pc;
-        true, flush_all queue [ J.Continue_statement label, J.N ])
+        if fall_through = pc
+        then false, flush_all queue []
+        else (
+          if debug ()
+          then
+            if Option.is_none label
+            then Format.eprintf "continue;@,"
+            else Format.eprintf "continue (%d);@," pc;
+          true, flush_all queue [ J.Continue_statement label, J.N ])
       else
         match List.assoc_opt pc scope_stack with
         | Some (l, used, Forward) ->
