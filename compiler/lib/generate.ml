@@ -1446,9 +1446,7 @@ and compile_block_no_loop st queue (pc : Addr.t) ~fall_through scope_stack =
         in
         never, code
   in
-
   let never_after, after = loop ~scope_stack ~fall_through (List.rev new_scopes) in
-  if debug () && not (List.is_empty new_scopes) then Format.eprintf "@]End of scope@;";
   never_after, seq @ after
 
 and compile_decision_tree st scope_stack ~src loc cx dtree kind ~fall_through =
