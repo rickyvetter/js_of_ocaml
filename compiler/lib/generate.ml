@@ -303,6 +303,10 @@ module Ctx = struct
     }
 end
 
+type edge_direction =
+  | Forward
+  | Backward
+
 let var x = J.EVar (J.V x)
 
 let int n = J.ENum (J.Num.of_int32 (Int32.of_int n))
@@ -1385,11 +1389,11 @@ and compile_block st queue (pc : Addr.t) scope_stack ~fall_through =
         let never_body, body =
           let lab =
             match scope_stack with
-            | (_, (l, _)) :: _ -> J.Label.succ l
+            | (_, (l, _, _)) :: _ -> J.Label.succ l
             | [] -> J.Label.zero
           in
           let lab_used = ref false in
-          let scope_stack = (pc, (lab, lab_used)) :: scope_stack in
+          let scope_stack = (pc, (lab, lab_used, Backward)) :: scope_stack in
           let never_body, body =
             compile_block_no_loop st queue pc scope_stack ~fall_through:pc
           in
@@ -1442,7 +1446,7 @@ and compile_block_no_loop st queue (pc : Addr.t) ~fall_through scope_stack =
   let seq, queue = translate_instrs st.ctx queue block.body block.branch in
   let label =
     match scope_stack with
-    | (_, (l, _)) :: _ -> J.Label.succ l
+    | (_, (l, _, _)) :: _ -> J.Label.succ l
     | [] -> J.Label.zero
   in
   let is_switch pc =
@@ -1476,7 +1480,7 @@ and compile_block_no_loop st queue (pc : Addr.t) ~fall_through scope_stack =
     List.fold_left
       ~init:(label, scope_stack)
       ~f:(fun (label, scope_stack) pc ->
-        J.Label.succ label, (pc, (label, ref false)) :: scope_stack)
+        J.Label.succ label, (pc, (label, ref false, Forward)) :: scope_stack)
       new_scopes
   in
   let rec loop ~fall_through l =
@@ -1489,7 +1493,7 @@ and compile_block_no_loop st queue (pc : Addr.t) ~fall_through scope_stack =
     | x :: xs ->
         let never_inner, inner = loop ~fall_through:x xs in
         let never, code = compile_block st [] x scope_stack ~fall_through in
-        let l, used = List.assoc x scope_stack in
+        let l, used, _ = List.assoc x scope_stack in
         let code =
           if !used
           then [ J.Labelled_statement (l, (J.Block inner, J.N)), J.N ] @ code
@@ -1728,33 +1732,36 @@ and compile_branch st queue ((pc, _) as cont) scope_stack ~src ~fall_through : b
   compile_argument_passing st.ctx queue cont (fun queue ->
       if src >= 0 && Structure.is_backward st.structure src pc
       then (
-        let label =
+        let rec get_label scope_stack =
           match scope_stack with
           | [] -> assert false
-          | (pc', _) :: rem ->
+          | (_pc, (_, _, Forward)) :: rem -> get_label rem
+          | (pc', (_, _, Backward)) :: _rem ->
               if pc = pc'
               then None
               else
-                let lab, used = List.assoc pc rem in
+                let lab, used, _ = List.assoc pc scope_stack in
                 used := true;
                 Some lab
         in
+        let label = get_label scope_stack in
         if debug ()
         then
           if Option.is_none label
           then Format.eprintf "continue;@,"
           else Format.eprintf "continue (%d);@," pc;
         true, flush_all queue [ J.Continue_statement label, J.N ])
-      else if List.mem_assoc pc ~map:scope_stack
-      then
-        if pc = fall_through
-        then false, flush_all queue []
-        else (
-          if debug () then Format.eprintf "(br %d)@;" pc;
-          let l, used = List.assoc pc scope_stack in
-          used := true;
-          true, flush_all queue [ J.Break_statement (Some l), J.N ])
-      else compile_block st queue pc scope_stack ~fall_through)
+      else
+        match List.assoc_opt pc scope_stack with
+        | Some (l, used, Forward) ->
+            if pc = fall_through
+            then false, flush_all queue []
+            else (
+              if debug () then Format.eprintf "(br %d)@;" pc;
+              used := true;
+              true, flush_all queue [ J.Break_statement (Some l), J.N ])
+        | Some (_l, _used, Backward) -> assert false
+        | None -> compile_block st queue pc scope_stack ~fall_through)
 
 and compile_closure ctx (pc, args) =
   let st = build_graph ctx pc in

@@ -171,7 +171,6 @@ let for_for_while () =
       var j = 1;
       b:
       for(;;)
-       c:
        for(;;){
         if(10 <= caml_div(k, j)){
          var _b_ = j + 1 | 0;
@@ -184,7 +183,6 @@ let for_for_while () =
         try{caml_div(k, j);}
         catch(_c_){throw caml_maybe_attach_backtrace(Stdlib[8], 1);}
         id[1]++;
-        continue c;
        }
      }
     }
@@ -217,13 +215,12 @@ let rec equal eq xs ys =
     {|
     function equal(eq, xs, ys){
      var xs$0 = xs, ys$0 = ys;
-     a:
      for(;;){
       var match = caml_call1(xs$0, 0), match$0 = caml_call1(ys$0, 0);
       if(match){
        if(match$0){
         var ys$1 = match$0[2], xs$1 = match[2], xs$0 = xs$1, ys$0 = ys$1;
-        continue a;
+        continue;
        }
       }
       else if(! match$0) return 1;
@@ -264,22 +261,21 @@ let f t x =
      }
      if(val$0 && ! val$0[2]){
       var x$1 = val$0[1], x$0 = x$1;
-      a:
       for(;;){
-       b:
+       a:
        {
         try{var val = caml_call2(Stdlib_Hashtbl[6], t, x$0);}
         catch(_e_){
          var _a_ = caml_wrap_exception(_e_);
          if(_a_ !== Stdlib[3]) throw caml_maybe_attach_backtrace(_a_, 0);
          var _d_ = 0;
-         break b;
+         break a;
         }
         if(val && ! val[2]){
          var y = val[1], _b_ = y === (x$0 + 1 | 0) ? 1 : 0;
-         if(_b_){var _d_ = _b_; break b;}
+         if(_b_){var _d_ = _b_; break a;}
          var x$0 = y;
-         continue a;
+         continue;
         }
         var _d_ = 0;
        }
@@ -319,18 +315,17 @@ in loop x
       if(0 === x$1) return 1;
       if(1 !== x$1){var x$2 = x$1 + 1 | 0, x$1 = x$2; continue;}
       var x$0 = 2;
-      a:
       for(;;){
-       b:
+       a:
        {
         if(3 >= x$0 >>> 0)
          switch(x$0){
            case 0:
-            var _a_ = 1; break b;
+            var _a_ = 1; break a;
            case 2:
-            var n = caml_call1(Stdlib_Random[5], 2), _a_ = n + n | 0; break b;
+            var n = caml_call1(Stdlib_Random[5], 2), _a_ = n + n | 0; break a;
            case 3:
-            var n$0 = caml_call1(Stdlib_Random[5], 2), x$0 = n$0; continue a;
+            var n$0 = caml_call1(Stdlib_Random[5], 2), x$0 = n$0; continue;
          }
         var _a_ = 2;
        }
@@ -432,7 +427,6 @@ let add_substitute =
     {|
     function add_substitute(b, f, s){
      var lim$1 = caml_ml_string_length(s), previous = 32, i$4 = 0;
-     a:
      for(;;){
       if(i$4 >= lim$1){
        var _b_ = 92 === previous ? 1 : 0;
@@ -462,44 +456,43 @@ let add_substitute =
       var start$0 = i$4 + 1 | 0;
       if(lim$1 <= start$0) throw caml_maybe_attach_backtrace(Stdlib[8], 1);
       var opening = caml_string_get(s, start$0);
-      b:
+      a:
       {
        if(40 !== opening && 123 !== opening){
         var
          start = start$0 + 1 | 0,
          lim$0 = caml_ml_string_length(s),
          i$2 = start;
-        c:
         for(;;){
-         d:
+         b:
          if(lim$0 <= i$2)
           var stop$0 = lim$0;
          else{
           var match = caml_string_get(s, i$2);
-          e:
+          c:
           {
            if(91 <= match){
             if(97 <= match){
-             if(123 > match) break e;
+             if(123 > match) break c;
             }
-            else if(95 === match) break e;
+            else if(95 === match) break c;
            }
            else if(58 <= match){
-            if(65 <= match) break e;
+            if(65 <= match) break c;
            }
-           else if(48 <= match) break e;
+           else if(48 <= match) break c;
            var stop$0 = i$2;
-           break d;
+           break b;
           }
           var i$3 = i$2 + 1 | 0, i$2 = i$3;
-          continue c;
+          continue;
          }
          var
           match$0 =
             [0,
              caml_call3(Stdlib_String[15], s, start$0, stop$0 - start$0 | 0),
              stop$0];
-         break b;
+         break a;
         }
        }
        var new_start = start$0 + 1 | 0, k$2 = 0;
@@ -528,7 +521,7 @@ let add_substitute =
              caml_call3
               (Stdlib_String[15], s, new_start, (stop - start$0 | 0) - 1 | 0),
              stop + 1 | 0];
-         break b;
+         break a;
         }
         var i$0 = stop + 1 | 0, k$1 = k - 1 | 0, k = k$1, stop = i$0;
        }
@@ -536,7 +529,6 @@ let add_substitute =
       var next_i = match$0[2], ident = match$0[1];
       caml_call2(add_string, b, caml_call1(f, ident));
       var previous = 32, i$4 = next_i;
-      continue a;
      }
     }
     //end |}]

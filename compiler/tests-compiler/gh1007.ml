@@ -221,17 +221,16 @@ let ()  = M.myfun M.x
            l1 = s1,
            l2 = s2,
            accu = 0;
-          b:
           for(;;){
            if(l1){
             if(l2){
              var t2 = l2[2], h2 = l2[1], t1 = l1[2], h1 = l1[1];
              if(0 < caml_int_compare(h1, h2)){
               var accu$0 = [0, h2, accu], l2 = t2, accu = accu$0;
-              continue b;
+              continue;
              }
              var accu$1 = [0, h1, accu], l1 = t1, accu = accu$1;
-             continue b;
+             continue;
             }
             var _c_ = rev_append(l1, accu);
            }
@@ -300,17 +299,16 @@ let ()  = M.myfun M.x
            l1 = s1,
            l2 = s2,
            accu = 0;
-          b:
           for(;;){
            if(l1){
             if(l2){
              var t2 = l2[2], h2 = l2[1], t1 = l1[2], h1 = l1[1];
              if(0 < caml_int_compare(h1, h2)){
               var accu$0 = [0, h1, accu], l1 = t1, accu = accu$0;
-              continue b;
+              continue;
              }
              var accu$1 = [0, h2, accu], l2 = t2, accu = accu$1;
-             continue b;
+             continue;
             }
             var _a_ = rev_append(l1, accu);
            }
