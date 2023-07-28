@@ -1397,14 +1397,6 @@ and compile_block st queue (pc : Addr.t) scope_stack ~fall_through =
           let never_body, body =
             compile_block_no_loop st queue pc scope_stack ~fall_through:pc
           in
-          let body =
-            let rec remove_tailing_continue acc = function
-              | [] -> body
-              | [ (J.Continue_statement None, _) ] -> List.rev acc
-              | x :: xs -> remove_tailing_continue (x :: acc) xs
-            in
-            remove_tailing_continue [] body
-          in
           if debug () then Format.eprintf "}@]@,";
           let for_loop =
             ( J.For_statement (J.Left None, None, None, Js_simpl.block body)
