@@ -613,20 +613,6 @@ module DTree = struct
     let ai : (Code.cont * int list) array =
       Array.of_list (list_group fst snd (Array.to_list ai))
     in
-    if debug ()
-    then
-      Array.iter ai ~f:(fun ((pc, args), cases) ->
-          Format.eprintf
-            "Group cases (%a) -> %d %a@;"
-            (Format.pp_print_list
-               ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
-               (fun fmt case -> Format.fprintf fmt "%d" case))
-            cases
-            pc
-            (Format.pp_print_list
-               ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
-               (fun fmt a -> Code.Var.print fmt a))
-            args);
     let rec loop low up =
       let array_norm : (Code.cont * int list) array =
         normalize (Array.sub ai ~pos:low ~len:(up - low + 1))
@@ -1427,7 +1413,6 @@ and compile_block_no_loop st queue (pc : Addr.t) ~fall_through scope_stack =
   st.visited_blocks := Addr.Set.add pc !(st.visited_blocks);
   let block = Addr.Map.find pc st.blocks in
   let seq, queue = translate_instrs st.ctx queue block.body block.branch in
-  let label = next_label scope_stack in
   let is_switch pc =
     match fst block.branch with
     | Switch (_, a, b) ->
@@ -1438,7 +1423,6 @@ and compile_block_no_loop st queue (pc : Addr.t) ~fall_through scope_stack =
     | Cond (_, (pc1, _), (pc2, _)) -> pc1 = pc && pc2 = pc
     | _ -> false
   in
-
   let new_scopes =
     Structure.get_edges st.dom pc
     |> Addr.Set.elements
@@ -1446,29 +1430,15 @@ and compile_block_no_loop st queue (pc : Addr.t) ~fall_through scope_stack =
            is_switch pc' || Structure.is_merge_node st.structure pc')
     |> Structure.sort_in_post_order st.structure
   in
-  if debug () && not (List.is_empty new_scopes)
-  then
-    Format.eprintf
-      "@[<hv 2>Setup scopes: %a@,"
-      Format.(
-        pp_print_list
-          ~pp_sep:(fun fmt () -> Format.pp_print_string fmt ", ")
-          (fun fmt pc -> Format.fprintf fmt "%d" pc))
-      new_scopes;
-  let _label, scope_stack =
-    List.fold_left
-      ~init:(label, scope_stack)
-      ~f:(fun (label, scope_stack) pc ->
-        J.Label.succ label, (pc, (label, ref false, Forward)) :: scope_stack)
-      new_scopes
-  in
-  let rec loop ~fall_through l =
+  let rec loop scope_stack ~fall_through l =
     match l with
     | [] -> compile_conditional st queue ~src:pc ~fall_through block.branch scope_stack
     | x :: xs ->
-        let _never_inner, inner = loop ~fall_through:x xs in
+        let l = next_label scope_stack in
+        let used = ref false in
+        let scope_stack = (x, (l, used, Forward)) :: scope_stack in
+        let _never_inner, inner = loop scope_stack ~fall_through:x xs in
         let never, code = compile_block st [] x scope_stack ~fall_through in
-        let l, used, _ = List.assoc x scope_stack in
         let code =
           if !used
           then [ J.Labelled_statement (l, (J.Block inner, J.N)), J.N ] @ code
