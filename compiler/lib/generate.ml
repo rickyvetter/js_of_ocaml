@@ -1716,41 +1716,39 @@ and compile_argument_passing ctx queue (pc, args) continuation =
 
 and compile_branch st queue ((pc, _) as cont) scope_stack ~src ~fall_through : bool * _ =
   compile_argument_passing st.ctx queue cont (fun queue ->
-      if src >= 0 && Structure.is_backward st.structure src pc
-      then
-        let rec get_label scope_stack =
-          match scope_stack with
-          | [] -> assert false
-          | (_pc, (_, _, Forward)) :: rem -> get_label rem
-          | (pc', (_, _, Backward)) :: _rem ->
-              if pc = pc'
-              then None
-              else
-                let lab, used, _ = List.assoc pc scope_stack in
+      match List.assoc_opt pc scope_stack with
+      | Some (l, used, Backward) ->
+          assert (src >= 0 && Structure.is_backward st.structure src pc);
+          let rec needed scope_stack =
+            match scope_stack with
+            | [] -> assert false
+            | (_pc, (_, _, Forward)) :: rem -> needed rem
+            | (pc', (_, _, Backward)) :: _rem -> pc <> pc'
+          in
+          if fall_through = pc
+          then false, flush_all queue []
+          else
+            let label =
+              if needed scope_stack
+              then (
                 used := true;
-                Some lab
-        in
-        let label = get_label scope_stack in
-        if fall_through = pc
-        then false, flush_all queue []
-        else (
-          if debug ()
-          then
-            if Option.is_none label
-            then Format.eprintf "continue;@,"
-            else Format.eprintf "continue (%d);@," pc;
-          true, flush_all queue [ J.Continue_statement label, J.N ])
-      else
-        match List.assoc_opt pc scope_stack with
-        | Some (l, used, Forward) ->
-            if pc = fall_through
-            then false, flush_all queue []
-            else (
-              if debug () then Format.eprintf "(br %d)@;" pc;
-              used := true;
-              true, flush_all queue [ J.Break_statement (Some l), J.N ])
-        | Some (_l, _used, Backward) -> assert false
-        | None -> compile_block st queue pc scope_stack ~fall_through)
+                Some l)
+              else None
+            in
+            if debug ()
+            then
+              if Option.is_none label
+              then Format.eprintf "continue;@,"
+              else Format.eprintf "continue (%d);@," pc;
+            true, flush_all queue [ J.Continue_statement label, J.N ]
+      | Some (l, used, Forward) ->
+          if pc = fall_through
+          then false, flush_all queue []
+          else (
+            if debug () then Format.eprintf "(br %d)@;" pc;
+            used := true;
+            true, flush_all queue [ J.Break_statement (Some l), J.N ])
+      | None -> compile_block st queue pc scope_stack ~fall_through)
 
 and compile_closure ctx (pc, args) =
   let st = build_graph ctx pc in
