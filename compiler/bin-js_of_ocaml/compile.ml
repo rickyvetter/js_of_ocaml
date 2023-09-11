@@ -244,7 +244,7 @@ let run
     let uinfo = Unit_info.of_cmo cmo in
     Pretty_print.string fmt "\n";
     Pretty_print.string fmt (Unit_info.to_string uinfo);
-    output code ~source_map ~standalone ~linkall:false output_file
+    output code ~source_map ~standalone ~linkall output_file
   in
   (if runtime_only
    then (
