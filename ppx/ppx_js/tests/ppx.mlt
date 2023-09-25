@@ -111,6 +111,7 @@ fun (obj : < > Js.t) -> obj##m
 
 [%%expect
 {|
+
 Line _, characters 24-27:
 Error: This expression has type <  >
        It has no method m
@@ -121,6 +122,7 @@ fun (obj : < m : float Js.prop > Js.t) -> obj##m
 
 [%%expect
 {|
+
 Line _, characters 42-48:
 Error: This expression has type
          float Js_of_ocaml.Js.prop =
@@ -133,6 +135,7 @@ fun (obj : < m : float Js.meth > Js.t) -> obj##m + 1
 
 [%%expect
 {|
+
 Line _, characters 42-48:
 Error: This expression has type float but an expression was expected of type
          int
@@ -143,6 +146,7 @@ fun (obj : < m : int -> int Js.meth > Js.t) -> obj##m + 1
 
 [%%expect
 {|
+
 Line _, characters 47-53:
 Error: This expression has type int -> int Js_of_ocaml.Js.meth
        but an expression was expected of type 'res Js_of_ocaml.Js.meth
@@ -153,6 +157,7 @@ fun (obj : < m : int Js.meth > Js.t) -> obj##m 1
 
 [%%expect
 {|
+
 Line _, characters 40-46:
 Error: This expression has type int Js_of_ocaml.Js.meth
        but an expression was expected of type int -> 'res Js_of_ocaml.Js.meth
@@ -163,6 +168,7 @@ fun (obj : < m : int -> float Js.meth > Js.t) -> obj##m 1 + 1
 
 [%%expect
 {|
+
 Line _, characters 49-57:
 Error: This expression has type float but an expression was expected of type
          int
@@ -176,6 +182,7 @@ fun (obj : < m : 'a. 'a -> unit Js.meth > Js.t) ->
 
 [%%expect
 {|
+
 Line _, characters 2-5:
 Error: This expression has type < m : 'a. 'a -> unit Js_of_ocaml.Js.meth >
        It has no method w
@@ -188,6 +195,7 @@ fun (obj : int) -> obj##.p
 
 [%%expect
 {|
+
 Line _, characters 19-22:
 Error: This expression has type int but an expression was expected of type
          < .. > Js_of_ocaml.Js.t
@@ -198,6 +206,7 @@ fun (obj : < > Js.t) -> obj##.p
 
 [%%expect
 {|
+
 Line _, characters 24-27:
 Error: This expression has type <  >
        It has no method p
@@ -208,6 +217,7 @@ fun (obj : < p : float Js.writeonly_prop > Js.t) -> obj##.p + 1
 
 [%%expect
 {|
+
 Line _, characters 58-59:
 Error: This expression has type
          float Js_of_ocaml.Js.writeonly_prop =
@@ -222,6 +232,7 @@ fun (obj : < p : float Js.prop > Js.t) -> obj##.p + 1
 
 [%%expect
 {|
+
 Line _, characters 42-49:
 Error: This expression has type float but an expression was expected of type
          int
@@ -234,6 +245,7 @@ fun (obj : int) -> obj##.p := 2
 
 [%%expect
 {|
+
 Line _, characters 19-22:
 Error: This expression has type int but an expression was expected of type
          < .. > Js_of_ocaml.Js.t
@@ -244,6 +256,7 @@ fun (obj : < > Js.t) -> obj##.p := 2
 
 [%%expect
 {|
+
 Line _, characters 24-27:
 Error: This expression has type <  >
        It has no method p
@@ -254,6 +267,7 @@ fun (obj : < p : float Js.readonly_prop > Js.t) -> obj##.p := 1
 
 [%%expect
 {|
+
 Line _, characters 51-58:
 Error: This expression has type
          float Js_of_ocaml.Js.readonly_prop =
@@ -268,6 +282,7 @@ fun (obj : < p : float Js.prop > Js.t) -> obj##.p := 1
 
 [%%expect
 {|
+
 Line _, characters 42-49:
 Error: This expression has type
          float Js_of_ocaml.Js.prop =
@@ -282,6 +297,7 @@ fun (obj : < p : int Js.prop > Js.t) -> (obj##.p := 1) + 1
 
 [%%expect
 {|
+
 Line _, characters 40-54:
 Error: This expression has type unit but an expression was expected of type
          int
@@ -298,6 +314,7 @@ fun (obj : < > Js.t) ->
 
 [%%expect
 {|
+
 Line _, characters 4-38:
 Error: This expression has type
          < m : unit Js_of_ocaml.Js.readonly_prop > Js_of_ocaml.Js.t
@@ -314,6 +331,7 @@ fun (obj : < m : float Js.prop > Js.t) ->
 
 [%%expect
 {|
+
 Line _, characters 4-45:
 Error: This expression has type
          < m : int Js_of_ocaml.Js.prop > Js_of_ocaml.Js.t
@@ -341,6 +359,7 @@ fun () ->
 
 [%%expect
 {|
+
 Line _, characters 3-79:
 Error: This expression has type
          < m : string Js_of_ocaml.Js.meth;
@@ -362,6 +381,7 @@ fun () ->
 
 [%%expect
 {|
+
 Line _, characters 8-10:
 Error: Duplicated val or method "_r" (normalized to "r").
 Line _, characters 8-9:
@@ -379,6 +399,7 @@ fun () ->
 
 [%%expect
 {|
+
 Line _, characters 9-13:
 Error: Duplicated val or method "_r_b" (normalized to "r").
 Line _, characters 9-13:
@@ -395,6 +416,7 @@ fun () ->
 
 [%%expect
 {|
+
 Line _, characters 16-18:
 Error: Duplicated val or method "_w" (normalized to "w").
 Line _, characters 16-17:
@@ -412,6 +434,7 @@ fun () ->
 
 [%%expect
 {|
+
 Line _, characters 17-21:
 Error: Duplicated val or method "_w_b" (normalized to "w").
 Line _, characters 17-21:
@@ -428,6 +451,7 @@ fun () ->
 
 [%%expect
 {|
+
 Line _, characters 11-13:
 Error: Duplicated val or method "_m" (normalized to "m").
 Line _, characters 11-12:
@@ -445,6 +469,7 @@ fun () ->
 
 [%%expect
 {|
+
 Line _, characters 12-17:
 Error: Duplicated val or method "_m_bc" (normalized to "m").
 Line _, characters 12-16:
@@ -464,6 +489,7 @@ fun () ->
 
 [%%expect
 {|
+
 Line _, characters 3-102:
 Error: This expression has type
          < m : string Js_of_ocaml.Js.meth;
@@ -495,6 +521,7 @@ fun () ->
 
 [%%expect
 {|
+
 Line _, characters 3-98:
 Error: This expression has type
          < m : string Js_of_ocaml.Js.meth;
@@ -524,6 +551,7 @@ fun () ->
     : < r : int Js.prop ; .. > Js.t)
 
 [%%expect {|
+
 Line _, characters 5-40:
 Error: A mutable field cannot be readonly.
 |}]
@@ -541,6 +569,7 @@ fun () ->
 
 [%%expect
 {|
+
 Line _, characters 3-97:
 Error: This expression has type
          < m : string Js_of_ocaml.Js.meth;
@@ -570,6 +599,7 @@ fun () ->
     : < r : int Js.prop ; .. > Js.t)
 
 [%%expect {|
+
 Line _, characters 5-54:
 Error: Too many attributes.
 |}]
@@ -586,6 +616,7 @@ fun () ->
     : < r : int Js.prop ; .. > Js.t)
 
 [%%expect {|
+
 Line _, characters 5-37:
 Error: Unkown jsoo attribute ([@@jsoo.wrong]).
 |}]
@@ -598,6 +629,7 @@ fun () ->
 
 [%%expect
 {|
+
 - : unit -> < r : int Js_of_ocaml.Js.readonly_prop > Js_of_ocaml.Js.t = <fun>
 |}]
 
@@ -609,6 +641,7 @@ fun () ->
 
 [%%expect
 {|
+
 - : unit -> < r : int Js_of_ocaml.Js.writeonly_prop > Js_of_ocaml.Js.t =
 <fun>
 |}]
@@ -620,6 +653,7 @@ fun () ->
   end
 
 [%%expect {|
+
 - : unit -> < r : int Js_of_ocaml.Js.prop > Js_of_ocaml.Js.t = <fun>
 |}]
 
@@ -631,6 +665,7 @@ fun () ->
 
 [%%expect
 {|
+
 - : unit -> < r : int Js_of_ocaml.Js.optdef_prop > Js_of_ocaml.Js.t = <fun>
 |}]
 
@@ -642,6 +677,7 @@ fun () ->
 
 [%%expect
 {|
+
 - : unit -> < r : int Js_of_ocaml.Js.optdef_prop > Js_of_ocaml.Js.t = <fun>
 |}]
 
@@ -675,6 +711,7 @@ fun () ->
 
 [%%expect
 {|
+
 - : unit ->
     < foo : int -> unit Js_of_ocaml.Js.meth;
       t1 : int Js_of_ocaml.Js.optdef_prop;

@@ -318,7 +318,11 @@ module Fragment = struct
     | None ->
         let lex = Parse_js.Lexer.of_string ~filename content in
         parse_from_lex ~filename lex
-    | Some fragments -> Marshal.from_string fragments 0
+    | Some fragments -> (
+        try Marshal.from_string fragments 0
+        with e ->
+          Printf.eprintf "failed to unmarshall %S\n%S\n" filename (Printexc.to_string e);
+          raise e)
 
   let parse_string string =
     let filename = "<string>" in

@@ -282,7 +282,7 @@ end = struct
             Ocaml_compiler.Ident.table_contents entries
             |> List.filter_map ~f:(fun (ent, ident) ->
                    match ent with
-                   | Function i -> Some (i, ident)
+                   | Function i -> Some (i / 3, ident)
                    | Free_variable _ -> None)
       in
 

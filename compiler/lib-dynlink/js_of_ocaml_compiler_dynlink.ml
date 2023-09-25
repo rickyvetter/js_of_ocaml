@@ -20,9 +20,9 @@ let () =
   Config.Flag.set "use-js-string" (Jsoo_runtime.Sys.Config.use_js_string ());
   Config.Flag.set "effects" (Jsoo_runtime.Sys.Config.effects ());
   (* this needs to stay synchronized with toplevel.js *)
-  let toplevel_compile (s : bytes array) (debug : Instruct.debug_event list array) :
-      unit -> J.t =
-    let s = String.concat ~sep:"" (List.map ~f:Bytes.to_string (Array.to_list s)) in
+  let toplevel_compile (s : _ Bigarray.Array1.t) (debug : Instruct.debug_event list array)
+      : unit -> J.t =
+    let s = String.init (Bigarray.Array1.dim s) ~f:(fun i -> Bigarray.Array1.get s i) in
     let prims = split_primitives (Symtable.data_primitive_names ()) in
     let b = Buffer.create 100 in
     let fmt = Pretty_print.to_buffer b in
