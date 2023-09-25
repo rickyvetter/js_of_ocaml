@@ -70,9 +70,11 @@ function caml_domain_spawn(f,mutex){
     var id = caml_domain_latest_idx++;
     var old = caml_domain_id;
     caml_domain_id = id;
-    caml_callback(f,[0]);
+    var res = caml_callback(f,[0]);
     caml_domain_id = old;
-    caml_ml_mutex_unlock(mutex);
+    caml_ml_mutex_unlock(mutex[2]);
+    //TODO: fix exn case
+    mutex[1] = [0, [0, res]];
     return id;
 }
 
