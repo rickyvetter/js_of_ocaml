@@ -119,7 +119,7 @@ let run
         Some (Hashtbl.fold (fun cmi () acc -> cmi :: acc) t [])
   in
   let runtime_files =
-    if toplevel || dynlink
+    if (not no_runtime) && (toplevel || dynlink)
     then
       let add_if_absent x l = if List.mem x ~set:l then l else x :: l in
       runtime_files |> add_if_absent "+toplevel.js" |> add_if_absent "+dynlink.js"
@@ -238,6 +238,7 @@ let run
       (cmo : Cmo_format.compilation_unit)
       ~standalone
       ~source_map
+      ~linkall
       code
       ((_, fmt) as output_file) =
     assert (not standalone);
@@ -320,6 +321,7 @@ let run
                failwith "use [-o dirname/] or remove [--keep-unit-names]"
          in
          let t1 = Timer.make () in
+         let linkall = linkall || toplevel || dynlink in
          let code =
            Parse_bytecode.from_cmo
              ~includes:include_dirs
@@ -335,7 +337,7 @@ let run
            ~build_info:(Build_info.create `Cmo)
            ~source_map
            output_file
-           (output_partial cmo code)
+           (output_partial cmo code ~linkall)
      | `Cma cma when keep_unit_names ->
          List.iter cma.lib_units ~f:(fun cmo ->
              let output_file =
@@ -349,6 +351,7 @@ let run
                    failwith "use [-o dirname/] or remove [--keep-unit-names]"
              in
              let t1 = Timer.make () in
+             let linkall = linkall || toplevel || dynlink in
              let code =
                Parse_bytecode.from_cmo
                  ~includes:include_dirs
@@ -370,11 +373,12 @@ let run
                ~build_info:(Build_info.create `Cma)
                ~source_map
                (`Name output_file)
-               (output_partial cmo code))
+               (output_partial cmo code ~linkall))
      | `Cma cma ->
          let f ~standalone ~source_map output =
            List.fold_left cma.lib_units ~init:source_map ~f:(fun source_map cmo ->
                let t1 = Timer.make () in
+               let linkall = linkall || toplevel || dynlink in
                let code =
                  Parse_bytecode.from_cmo
                    ~includes:include_dirs
@@ -390,7 +394,7 @@ let run
                    Timer.print
                    t1
                    (Ocaml_compiler.Cmo_format.name cmo);
-               output_partial cmo ~standalone ~source_map code output)
+               output_partial cmo ~standalone ~source_map code output ~linkall)
          in
          output_gen
            ~standalone:false
