@@ -238,14 +238,26 @@ let run
       (cmo : Cmo_format.compilation_unit)
       ~standalone
       ~source_map
-      ~linkall
       code
       ((_, fmt) as output_file) =
     assert (not standalone);
     let uinfo = Unit_info.of_cmo cmo in
     Pretty_print.string fmt "\n";
     Pretty_print.string fmt (Unit_info.to_string uinfo);
-    output code ~source_map ~standalone ~linkall output_file
+    output code ~source_map ~standalone ~linkall:false output_file
+  in
+  let output_runtime ~standalone ~source_map ((_, fmt) as output_file) =
+    assert (not standalone);
+    let uinfo = Unit_info.of_primitives [] in
+    Pretty_print.string fmt "\n";
+    Pretty_print.string fmt (Unit_info.to_string uinfo);
+    let code =
+      { Parse_bytecode.code = Code.empty
+      ; cmis = StringSet.empty
+      ; debug = Parse_bytecode.Debug.create ~include_cmis:false false
+      }
+    in
+    output code ~source_map ~standalone ~linkall:true output_file
   in
   (if runtime_only
    then (
@@ -321,7 +333,6 @@ let run
                failwith "use [-o dirname/] or remove [--keep-unit-names]"
          in
          let t1 = Timer.make () in
-         let linkall = linkall || toplevel || dynlink in
          let code =
            Parse_bytecode.from_cmo
              ~includes:include_dirs
@@ -330,6 +341,7 @@ let run
              cmo
              ic
          in
+         let linkall = linkall || toplevel || dynlink in
          if times () then Format.eprintf "  parsing: %a@." Timer.print t1;
          output_gen
            ~standalone:false
@@ -337,7 +349,12 @@ let run
            ~build_info:(Build_info.create `Cmo)
            ~source_map
            output_file
-           (output_partial cmo code ~linkall)
+           (fun ~standalone ~source_map output ->
+             if linkall
+             then
+               ignore
+                 (output_runtime ~standalone ~source_map output : Source_map.t option);
+             output_partial cmo code ~standalone ~source_map output)
      | `Cma cma when keep_unit_names ->
          List.iter cma.lib_units ~f:(fun cmo ->
              let output_file =
@@ -351,7 +368,6 @@ let run
                    failwith "use [-o dirname/] or remove [--keep-unit-names]"
              in
              let t1 = Timer.make () in
-             let linkall = linkall || toplevel || dynlink in
              let code =
                Parse_bytecode.from_cmo
                  ~includes:include_dirs
@@ -373,12 +389,15 @@ let run
                ~build_info:(Build_info.create `Cma)
                ~source_map
                (`Name output_file)
-               (output_partial cmo code ~linkall))
+               (output_partial cmo code))
      | `Cma cma ->
+         let linkall = linkall || toplevel || dynlink in
          let f ~standalone ~source_map output =
+           if linkall
+           then
+             ignore (output_runtime ~standalone ~source_map output : Source_map.t option);
            List.fold_left cma.lib_units ~init:source_map ~f:(fun source_map cmo ->
                let t1 = Timer.make () in
-               let linkall = linkall || toplevel || dynlink in
                let code =
                  Parse_bytecode.from_cmo
                    ~includes:include_dirs
@@ -394,7 +413,7 @@ let run
                    Timer.print
                    t1
                    (Ocaml_compiler.Cmo_format.name cmo);
-               output_partial cmo ~standalone ~source_map code output ~linkall)
+               output_partial cmo ~standalone ~source_map code output)
          in
          output_gen
            ~standalone:false
