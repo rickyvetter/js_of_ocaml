@@ -350,10 +350,11 @@ let run
            ~source_map
            output_file
            (fun ~standalone ~source_map output ->
-             if linkall
-             then
-               ignore
-                 (output_runtime ~standalone ~source_map output : Source_map.t option);
+             let source_map =
+               if linkall
+               then output_runtime ~standalone ~source_map output
+               else source_map
+             in
              output_partial cmo code ~standalone ~source_map output)
      | `Cma cma when keep_unit_names ->
          List.iter cma.lib_units ~f:(fun cmo ->
@@ -393,9 +394,9 @@ let run
      | `Cma cma ->
          let linkall = linkall || toplevel || dynlink in
          let f ~standalone ~source_map output =
-           if linkall
-           then
-             ignore (output_runtime ~standalone ~source_map output : Source_map.t option);
+           let source_map =
+             if linkall then output_runtime ~standalone ~source_map output else source_map
+           in
            List.fold_left cma.lib_units ~init:source_map ~f:(fun source_map cmo ->
                let t1 = Timer.make () in
                let code =
