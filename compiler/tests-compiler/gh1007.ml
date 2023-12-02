@@ -162,7 +162,7 @@ let ()  = M.myfun M.x
        next = x$0[1],
        rev_sort =
          function(n, l){
-          if(Object.is(2, n)){
+          if(2 === n){
            if(l){
             var match = l[2];
             if(match){
@@ -178,7 +178,7 @@ let ()  = M.myfun M.x
             }
            }
           }
-          else if(Object.is(3, n) && l){
+          else if(3 === n && l){
            var _d_ = l[2];
            if(_d_){
             var match$2 = _d_[2];
@@ -240,7 +240,7 @@ let ()  = M.myfun M.x
          },
        sort =
          function(n, l){
-          if(Object.is(2, n)){
+          if(2 === n){
            if(l){
             var match = l[2];
             if(match){
@@ -256,7 +256,7 @@ let ()  = M.myfun M.x
             }
            }
           }
-          else if(Object.is(3, n) && l){
+          else if(3 === n && l){
            var _b_ = l[2];
            if(_b_){
             var match$2 = _b_[2];
@@ -390,7 +390,7 @@ let ()  = M.run ()
          };
       if(even(i)) caml_call1(Stdlib[42], cst);
       var _a_ = i + 1 | 0;
-      if(Object.is(4, i)) return 0;
+      if(4 === i) return 0;
       var i = _a_;
      }
     }
@@ -499,7 +499,7 @@ let ()  = M.run ()
        even = closures$0[1];
       if(even(i)) caml_call1(Stdlib[42], cst);
       var _e_ = i + 1 | 0;
-      if(Object.is(4, i)){
+      if(4 === i){
        var _d_ = caml_call1(list_rev, delayed[1]);
        return caml_call2(list_iter, function(f){return caml_call1(f, 0);}, _d_);
       }
@@ -631,7 +631,7 @@ let ()  = M.run ()
        var f = param$0[2], param$0 = f(0);
       }
       var _g_ = i + 1 | 0;
-      if(Object.is(4, i)){
+      if(4 === i){
        var _f_ = caml_call1(list_rev, delayed[1]);
        return caml_call2(list_iter, function(f){return caml_call1(f, 0);}, _f_);
       }
