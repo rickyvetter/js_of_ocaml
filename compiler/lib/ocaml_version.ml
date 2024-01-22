@@ -64,6 +64,23 @@ let rec compare v v' =
       | 0 -> compare xs ys
       | n -> n)
 
+type v4 =
+  [ `V4_08
+  | `V4_09
+  | `V4_10
+  | `V4_11
+  | `V4_12
+  | `V4_13
+  | `V4_14
+  ]
+
+type v5 =
+  [ `V5_00
+  | `V5_01
+  | `V5_02
+  | `V5_03
+  ]
+
 let v =
   match current with
   | 4 :: 8 :: _ -> `V4_08
