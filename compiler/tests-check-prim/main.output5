@@ -214,6 +214,3 @@ caml_unix_symlink
 caml_unix_time
 caml_unix_unlink
 
-From +zstd.js:
-caml_zstd_initialize
-

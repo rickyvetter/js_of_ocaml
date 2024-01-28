@@ -302,6 +302,3 @@ caml_unix_findfirst
 caml_unix_findnext
 caml_unix_startup
 
-From +zstd.js:
-caml_zstd_initialize
-
