@@ -406,7 +406,7 @@ let%expect_test _ =
 
 let%expect_test _ =
   let open Js_of_ocaml in
-  let f = Js.wrap_callback (fun s -> print_endline s) in
+  let f = Js.wrap_callback (fun s -> print_endline (Js.to_string s)) in
   Js.export "f" f;
   let () =
     Js.Unsafe.fun_call
